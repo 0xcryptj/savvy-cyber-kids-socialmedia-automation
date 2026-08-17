@@ -6,6 +6,10 @@ out
 !.env.example
 *.db
 *.db-journal
+*.tsbuildinfo
 storage/generated/*
 !storage/generated/.gitkeep
+public/generated/*
+!public/generated/placeholder.svg
+storage/workspace.json
 npm-debug.log*

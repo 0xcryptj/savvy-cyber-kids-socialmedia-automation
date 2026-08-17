@@ -10,14 +10,14 @@ cp .env.example .env
 npm run dev
 ```
 
-Open http://localhost:3000. `/review` and `/queue` are seeded with mock posts so the control room can be exercised without third-party credentials.
+Open http://localhost:3000. `/library` loads the live blog and news sources. Select an article to generate a review-ready social package; no mock posts are loaded.
 
 ## Safety defaults
 
 - `AUTO_PUBLISH=false` and approval is mandatory.
 - The original article title is validated for exact preservation.
 - The model supplies exactly two topical hashtags; application logic appends `#savvycyberkids` and `#cyberhero` for exactly four total.
-- Make.com, SocialBee, Canva, and OpenAI are connector seams, not assumed-live services.
+- Make.com, SocialBee, Canva, and OpenAI require their configured credentials. Without OpenAI, local copy generation and the branded template renderer remain available.
 
 ## Commands
 

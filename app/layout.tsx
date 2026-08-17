@@ -1,6 +1,41 @@
 import "./globals.css";
-import Link from "next/link";
+import { SidebarNav } from "./components/SidebarNav";
+import { AutoPipeline } from "./components/AutoPipeline";
 import type { ReactNode } from "react";
 
-const nav = [["/", "Overview"], ["/review", "Pending review"], ["/queue", "Approved queue"], ["/scheduled", "Scheduled"], ["/history", "History"], ["/failed", "Failures"], ["/settings", "Settings"]];
-export default function RootLayout({ children }: { children: ReactNode }) { return <html lang="en"><body><aside><div className="brand"><span className="brand-mark">✦</span><span>savvy<br /><b>cyber kids</b></span></div><p className="eyebrow">SOCIAL CONTROL ROOM</p><nav>{nav.map(([href, label]) => <Link key={href} href={href}>{label}</Link>)}</nav><div className="sidebar-foot"><span className="live-dot" /> Local workspace<br /><small>Human review required</small></div></aside><main><header><div><p className="eyebrow">WEDNESDAY · AUGUST 19, 2026</p><h1>Good things worth sharing.</h1></div><div className="header-actions"><span className="safe-pill">● AUTO-PUBLISH OFF</span><button className="icon-button">⌕</button><div className="avatar">SC</div></div></header>{children}</main></body></html> }
+export default function RootLayout({ children }: { children: ReactNode }) {
+  const today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  return (
+    <html lang="en">
+      <body>
+        <AutoPipeline />
+        <aside>
+          <div className="brand">
+            <img className="brand-logo" src="/branding/sck-logo-150.png" alt="Savvy Cyber Kids" />
+            <span>savvy<br /><b>cyber kids</b></span>
+          </div>
+          <p className="eyebrow">SOCIAL CONTROL ROOM</p>
+          <SidebarNav />
+          <div className="sidebar-foot">
+            <span className="live-dot" /> Live feeds connected
+            <br />
+            <small>Human review required</small>
+          </div>
+        </aside>
+        <main>
+          <header>
+            <div>
+              <p className="eyebrow">{today.toUpperCase()}</p>
+              <h1>Good things worth sharing.</h1>
+            </div>
+            <div className="header-actions">
+              <span className="safe-pill">● AUTO-PUBLISH OFF</span>
+              <div className="avatar">SC</div>
+            </div>
+          </header>
+          {children}
+        </main>
+      </body>
+    </html>
+  );
+}

@@ -1,2 +1,9 @@
 import { DesignRenderer, RenderRequest, RenderedGraphic } from "./renderer";
-export class LocalRenderer implements DesignRenderer { async render(_request: RenderRequest): Promise<RenderedGraphic> { return { path: "/generated/placeholder.svg", provider: "local" }; } }
+import { CanvaRenderer } from "./canva";
+
+export class LocalRenderer implements DesignRenderer {
+  async render(request: RenderRequest): Promise<RenderedGraphic> {
+    const rendered = await new CanvaRenderer().render(request);
+    return { path: rendered.path, provider: "local" };
+  }
+}
