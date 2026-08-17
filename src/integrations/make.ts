@@ -1,0 +1,2 @@
+export interface MakeHandoff { sendApprovedPost(input: { postId: string; caption: string; graphicPath?: string }): Promise<{ accepted: boolean; externalId?: string }>; }
+export class ConfiguredMakeHandoff implements MakeHandoff { async sendApprovedPost(): Promise<{ accepted: boolean }> { if (!process.env.MAKE_WEBHOOK_URL) throw new Error("MAKE_WEBHOOK_URL is not configured"); return { accepted: false }; } }

@@ -1,0 +1,1 @@
+import { EmptyPage } from "@/src/lib/page-state"; export default function Scheduled(){return <EmptyPage eyebrow="CONTENT PIPELINE / OUTBOUND" title="Scheduled posts" description="Scheduled state will appear here after Make.com and SocialBee are connected." />}

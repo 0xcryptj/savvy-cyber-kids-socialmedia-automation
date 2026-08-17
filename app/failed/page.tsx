@@ -1,0 +1,1 @@
+import { EmptyPage } from "@/src/lib/page-state"; export default function Failed(){return <EmptyPage eyebrow="CONTENT PIPELINE / RECOVERY" title="Failures" description="No failed workflow stages. Retry controls will appear here when needed." />}

@@ -1,0 +1,1 @@
+import { EmptyPage } from "@/src/lib/page-state"; export default function History(){return <EmptyPage eyebrow="CONTENT PIPELINE / ARCHIVE" title="Published history" description="Published posts and their audit trail will appear here." />}

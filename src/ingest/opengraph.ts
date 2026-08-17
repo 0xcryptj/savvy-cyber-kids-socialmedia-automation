@@ -1,0 +1,2 @@
+export type OpenGraphMetadata = { canonicalUrl?: string; title?: string; imageUrl?: string; description?: string };
+export function extractOpenGraph(html: string): OpenGraphMetadata { const get = (property: string) => html.match(new RegExp(`<meta[^>]+property=["']${property}["'][^>]+content=["']([^"']+)`, "i"))?.[1]; return { canonicalUrl: get("og:url"), title: get("og:title"), imageUrl: get("og:image"), description: get("og:description") }; }
