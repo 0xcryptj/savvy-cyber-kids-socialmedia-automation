@@ -3,6 +3,7 @@ import { generatedSocialPostSchema, GeneratedSocialPost } from "./schema";
 import { createLocalPost } from "./local-copy";
 import { buildFinalPost, validateGeneratedPost } from "./validate";
 import { getAISettings } from "@/src/config/ai-settings";
+import { getStoredCredential } from "@/src/config/credentials";
 
 export function finalizeGeneratedPost(input: GeneratedSocialPost) {
   return buildFinalPost(input);
@@ -10,13 +11,14 @@ export function finalizeGeneratedPost(input: GeneratedSocialPost) {
 
 const systemPrompt = `Create a warm, practical Savvy Cyber Kids social post for families. Preserve the article title exactly. Return exactly two topical hashtags; do not include #savvycyberkids or #cyberhero. Respond with JSON only matching this shape: {"topic_heading":"string","article_title":"string","caption":"string","hashtags":["#tag1","#tag2"]}.`;
 
-function apiKey(provider: string) {
-  return provider === "anthropic" ? process.env.ANTHROPIC_API_KEY || process.env.AI_API_KEY : process.env.OPENAI_API_KEY || process.env.AI_API_KEY;
+async function apiKey(provider: "openai" | "anthropic" | "openai-compatible") {
+  const stored = await getStoredCredential(provider);
+  return stored || (provider === "anthropic" ? process.env.ANTHROPIC_API_KEY || process.env.AI_API_KEY : process.env.OPENAI_API_KEY || process.env.AI_API_KEY);
 }
 
 async function generateWithProvider(article: SourceArticle): Promise<GeneratedSocialPost> {
   const settings = await getAISettings();
-  const key = apiKey(settings.provider);
+  const key = await apiKey(settings.provider);
   if (!key) throw new Error(`${settings.provider} API key is not configured`);
   const prompt = `Article title (preserve exactly): ${article.title}\nCategory: ${article.category}\n\nBody:\n${(article.body || article.excerpt).slice(0, 4000)}`;
   let response: Response;

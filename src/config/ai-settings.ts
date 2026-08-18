@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
+import { getStoredCredential } from "./credentials";
 
 export type AIProvider = "openai" | "anthropic" | "openai-compatible";
 export type AISettings = { provider: AIProvider; model: string; baseUrl?: string };
@@ -21,7 +22,7 @@ export async function saveAISettings(input: Partial<AISettings>): Promise<AISett
   const next: AISettings = {
     provider: input.provider === "anthropic" || input.provider === "openai-compatible" ? input.provider : current.provider,
     model: typeof input.model === "string" && input.model.trim() ? input.model.trim().slice(0, 120) : current.model,
-    baseUrl: typeof input.baseUrl === "string" ? input.baseUrl.trim().slice(0, 500) : current.baseUrl
+    baseUrl: normalizeBaseUrl(input.baseUrl, current.baseUrl)
   };
   await mkdir(path.dirname(filePath), { recursive: true });
   await writeFile(filePath, JSON.stringify(next, null, 2));
@@ -29,6 +30,20 @@ export async function saveAISettings(input: Partial<AISettings>): Promise<AISett
 }
 
 export function providerIsConfigured(provider: AIProvider): boolean {
-  if (provider === "anthropic") return Boolean(process.env.ANTHROPIC_API_KEY || process.env.AI_API_KEY);
-  return Boolean(process.env.OPENAI_API_KEY || process.env.AI_API_KEY);
+  return Boolean(provider === "anthropic" ? process.env.ANTHROPIC_API_KEY || process.env.AI_API_KEY : process.env.OPENAI_API_KEY || process.env.AI_API_KEY);
+}
+
+export async function providerHasCredential(provider: AIProvider): Promise<boolean> {
+  return Boolean((await getStoredCredential(provider)) || providerIsConfigured(provider));
+}
+
+export function normalizeBaseUrl(value: string | undefined, fallback = ""): string {
+  if (typeof value !== "string" || !value.trim()) return fallback;
+  const candidate = value.trim().slice(0, 500);
+  try {
+    const url = new URL(candidate);
+    const local = ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
+    if (url.protocol !== "https:" && !(url.protocol === "http:" && local)) return fallback;
+    return candidate.replace(/\/$/, "");
+  } catch { return fallback; }
 }

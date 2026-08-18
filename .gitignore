@@ -12,4 +12,6 @@ storage/generated/*
 public/generated/*
 !public/generated/placeholder.svg
 storage/workspace.json
+storage/settings.json
+storage/credentials.json
 npm-debug.log*
