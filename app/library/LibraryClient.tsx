@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { feedConfig, ContentCategory } from "@/config/feeds";
 import { SourceArticle } from "@/src/ingest/types";
+import { Spinner } from "@/app/components/Spinner";
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
@@ -21,7 +22,7 @@ function ArticleCard({ article, onCreate, busy }: { article: SourceArticle; onCr
         <p>{article.excerpt}</p>
         <div className="actions">
           <button onClick={() => onCreate(article)} disabled={busy === article.canonicalUrl}>
-            {busy === article.canonicalUrl ? "Creating…" : "Create social post"}
+            {busy === article.canonicalUrl ? <Spinner label="Writing post…" /> : "Create social post"}
           </button>
           <a className="button outline" href={article.externalUrl || article.sourceUrl} target="_blank" rel="noreferrer">Open article ↗</a>
         </div>
@@ -80,13 +81,13 @@ export function LibraryClient({ blog, news }: { blog: SourceArticle[]; news: Sou
           <h2>Pick a live article</h2>
           <p>Blog posts and news headlines stay in separate queues, then follow the same Canva template and review path.</p>
         </div>
-        <div className="actions"><button className="secondary" onClick={refreshSources} disabled={syncing}>{syncing ? "Refreshing…" : "Refresh sources"}</button><a className="button secondary" href={config.pageUrl} target="_blank" rel="noreferrer">View {config.label.toLowerCase()} ↗</a></div>
+        <div className="actions"><button className="secondary" onClick={refreshSources} disabled={syncing}>{syncing ? <Spinner label="Refreshing…" /> : "Refresh sources"}</button><a className="button secondary" href={config.pageUrl} target="_blank" rel="noreferrer">View {config.label.toLowerCase()} ↗</a></div>
       </div>
       <div className="tabs">
         <button className={tab === "blog" ? "active" : ""} onClick={() => setTab("blog")}>Blog content · {counts.blog}</button>
         <button className={tab === "news" ? "active" : ""} onClick={() => setTab("news")}>News feed · {counts.news}</button>
       </div>
-      {error ? <div className="card empty">{error}</div> : null}
+      {error ? <div className="card empty error-panel">{error}</div> : null}
       <div className="source-grid">
         {articles.map((article) => (
           <ArticleCard key={article.id} article={article} onCreate={createPost} busy={busy} />

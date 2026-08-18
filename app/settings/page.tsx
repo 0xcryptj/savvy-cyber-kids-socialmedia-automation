@@ -1,4 +1,5 @@
 import { designUrls, publishingUrls, sourceUrls } from "@/config/urls";
+import { SettingsClient } from "./SettingsClient";
 
 export default function Settings(){
   const openAiConfigured = Boolean(process.env.OPENAI_API_KEY);
@@ -13,5 +14,5 @@ export default function Settings(){
     ["SocialBee", "Planned", "Handled through Make.com"],
     ["Publishing", autoPublish ? "Enabled" : "Safe", autoPublish ? "AUTO_PUBLISH=true" : "AUTO_PUBLISH=false · approval required"]
   ];
-  return <><div className="page-intro"><div><p className="eyebrow">WORKSPACE / CONFIGURATION</p><h2>Connector status</h2><p>Secrets are environment-only and never stored in the database.</p></div></div><div className="queue-list">{rows.map(([name,status,note])=><div className="card queue-row" key={name}><div><h3>{name}</h3><p>{note}</p></div><span className={status==="Ready"||status==="Safe"||status==="Configured"||status==="Connected"?"status":"count"}>{status}</span></div>)}</div><div className="card side-card section"><p className="eyebrow">REFERENCE LINKS</p><div className="quick-links"><a href={sourceUrls.blog} target="_blank" rel="noreferrer">Blog posts ↗</a><a href={sourceUrls.newsFeed} target="_blank" rel="noreferrer">News feed articles ↗</a><a href={designUrls.canvaTemplate} target="_blank" rel="noreferrer">Canva design template ↗</a><a href={publishingUrls.socialBee} target="_blank" rel="noreferrer">SocialBee ↗</a></div></div></>;
+  return <SettingsClient rows={rows} links={[{ label: "Blog posts", href: sourceUrls.blog }, { label: "News feed articles", href: sourceUrls.newsFeed }, { label: "Canva design template", href: designUrls.canvaTemplate }, { label: "SocialBee", href: publishingUrls.socialBee }]} />;
 }

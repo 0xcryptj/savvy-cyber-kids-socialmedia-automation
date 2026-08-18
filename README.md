@@ -12,6 +12,8 @@ npm run dev
 
 Open http://localhost:3000. `/library` loads the live blog and news sources. Select an article to generate a review-ready social package; no mock posts are loaded.
 
+AI providers are selected from `/settings`. OpenAI and Anthropic use `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`; OpenRouter, Groq, Together, Ollama, and other OpenAI-compatible services use `AI_API_KEY` plus `AI_BASE_URL`. The selected model is saved locally in `storage/settings.json`.
+
 ## Safety defaults
 
 - `AUTO_PUBLISH=false` and approval is mandatory.

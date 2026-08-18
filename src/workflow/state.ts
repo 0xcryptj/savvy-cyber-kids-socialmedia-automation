@@ -16,7 +16,7 @@ export type PostStatus = (typeof PostStatus)[keyof typeof PostStatus];
 const transitions: Record<PostStatus, readonly PostStatus[]> = {
   DISCOVERED: ["GENERATING", "FAILED"], GENERATING: ["PENDING_REVIEW", "FAILED"],
   PENDING_REVIEW: ["REVISION", "REJECTED", "APPROVED", "FAILED"], REVISION: ["PENDING_REVIEW", "FAILED"],
-  REJECTED: [], APPROVED: ["QUEUED", "FAILED"], QUEUED: ["SCHEDULED", "FAILED"],
+  REJECTED: [], APPROVED: ["QUEUED", "PUBLISHED", "FAILED"], QUEUED: ["SCHEDULED", "FAILED"],
   SCHEDULED: ["PUBLISHED", "FAILED"], PUBLISHED: [], FAILED: ["DISCOVERED", "GENERATING", "QUEUED"]
 };
 

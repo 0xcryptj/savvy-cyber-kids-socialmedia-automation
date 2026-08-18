@@ -20,6 +20,8 @@ export type WorkspacePost = {
   approvedAt?: string;
   queuedAt?: string;
   scheduledAt?: string;
+  publishedVia?: string;
+  publishExternalId?: string;
 };
 
 export type WorkspaceState = { posts: WorkspacePost[] };

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Spinner } from "@/app/components/Spinner";
 
 export function QueueHandoffButton({ id }: { id: string }) {
   const router = useRouter();
@@ -14,5 +15,5 @@ export function QueueHandoffButton({ id }: { id: string }) {
     if (!response.ok) setError(payload.error || "Handoff failed"); else router.refresh();
     setBusy(false);
   }
-  return <span><button onClick={handoff} disabled={busy}>{busy ? "Sending…" : "Queue for Make"}</button>{error ? <small className="error-text">{error}</small> : null}</span>;
+  return <span><button onClick={handoff} disabled={busy}>{busy ? <Spinner label="Posting…" /> : "Mark as posted"}</button>{error ? <small className="error-text">{error}</small> : null}</span>;
 }

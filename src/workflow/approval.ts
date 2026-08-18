@@ -27,6 +27,7 @@ const stamps: Partial<Record<PostStatus, keyof WorkspacePost>> = {
 export async function transitionPost(id: string, next: PostStatus, patch?: Partial<WorkspacePost>): Promise<WorkspacePost> {
   const post = await getPost(id);
   if (!post) throw new Error("Post not found");
+  if (post.status === next) return savePost({ ...post, ...patch });
   assertTransition(post.status, next);
   const stamp = stamps[next];
   return savePost({

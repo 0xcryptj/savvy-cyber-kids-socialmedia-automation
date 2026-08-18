@@ -12,8 +12,8 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
   if (!post) return NextResponse.json({ error: "Post not found" }, { status: 404 });
   if (post.status !== "APPROVED") return NextResponse.json({ error: "Only approved posts can be handed off" }, { status: 400 });
   try {
-    await new ConfiguredMakeHandoff().sendApprovedPost({ postId: post.id, caption: post.caption, hashtags: post.hashtags, graphicPath: post.graphicPath });
-    return NextResponse.json(await transitionPost(id, "QUEUED"));
+    const result = await new ConfiguredMakeHandoff().sendApprovedPost({ postId: post.id, caption: post.caption, hashtags: post.hashtags, graphicPath: post.graphicPath });
+    return NextResponse.json(await transitionPost(id, "PUBLISHED", { publishedVia: "Make.com", publishExternalId: result.externalId }));
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Handoff failed" }, { status: 400 });
   }
