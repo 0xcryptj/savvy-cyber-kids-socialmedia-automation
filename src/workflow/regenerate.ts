@@ -5,6 +5,7 @@ import { findSourceArticle, hydrateArticle } from "@/src/ingest/wordpress";
 import { SourceArticle } from "@/src/ingest/types";
 import { getPost, savePost } from "@/src/workspace/store";
 import { WorkspacePost } from "@/src/workspace/types";
+import { boundedText } from "@/src/lib/request-security";
 
 function fallbackArticle(post: WorkspacePost): SourceArticle {
   return {
@@ -23,7 +24,7 @@ function fallbackArticle(post: WorkspacePost): SourceArticle {
   };
 }
 
-export async function regeneratePost(id: string): Promise<WorkspacePost> {
+export async function regeneratePost(id: string, reviewerGuidance?: string): Promise<WorkspacePost> {
   const previous = await getPost(id);
   if (!previous) throw new Error("Post not found");
 
@@ -35,7 +36,7 @@ export async function regeneratePost(id: string): Promise<WorkspacePost> {
     // Regeneration remains available when the source feed is temporarily down.
   }
 
-  const generated = finalizeGeneratedPost(await generateSocialPost(article));
+  const generated = finalizeGeneratedPost(await generateSocialPost(article, boundedText(reviewerGuidance, 1000)));
   const nextId = `post_${randomUUID().slice(0, 8)}`;
   return savePost({
     ...previous,

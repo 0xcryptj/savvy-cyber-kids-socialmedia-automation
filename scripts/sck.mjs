@@ -4,10 +4,16 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 const repo = join(import.meta.dirname, "..");
-const port = process.env.SCK_PORT || "3000";
+const configuredPort = process.env.SCK_PORT || "3000";
+const configuredPortNumber = Number(configuredPort);
+const port = Number.isInteger(configuredPortNumber) && configuredPortNumber >= 1024 && configuredPortNumber <= 65535
+  ? String(configuredPortNumber)
+  : "3000";
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const token = randomBytes(32).toString("hex");
 const url = `http://127.0.0.1:${port}`;
+
+if (configuredPort !== port) console.warn(`Ignoring invalid SCK_PORT=${configuredPort}; using ${port}.`);
 
 function openBrowser() {
   const command = process.platform === "darwin" ? "open" : process.platform === "win32" ? "cmd.exe" : "xdg-open";

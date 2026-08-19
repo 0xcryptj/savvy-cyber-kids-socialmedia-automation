@@ -17,7 +17,7 @@ async function apiKey(provider: "openai" | "anthropic" | "openai-compatible") {
   return stored || (provider === "anthropic" ? process.env.ANTHROPIC_API_KEY || process.env.AI_API_KEY : process.env.OPENAI_API_KEY || process.env.AI_API_KEY);
 }
 
-async function generateWithProvider(article: SourceArticle): Promise<GeneratedSocialPost> {
+async function generateWithProvider(article: SourceArticle, reviewerGuidance?: string): Promise<GeneratedSocialPost> {
   const settings = await getAISettings();
   const key = await apiKey(settings.provider);
   if (!key) throw new Error(`${settings.provider} API key is not configured`);
@@ -25,7 +25,10 @@ async function generateWithProvider(article: SourceArticle): Promise<GeneratedSo
   const feedbackContext = feedback.length
     ? `\n\nRecent human feedback from this feed:\n${feedback.map((item) => `- ${item.status}: ${item.note || "No note supplied"}`).join("\n")}\nUse this as guidance, but preserve the article title and the required output shape.`
     : "";
-  const prompt = `Article title (preserve exactly): ${article.title}\nCategory: ${article.category}\n\nBody:\n${(article.body || article.excerpt).slice(0, 4000)}${feedbackContext}`;
+  const guidanceContext = reviewerGuidance?.trim()
+    ? `\n\nReviewer guidance for this regeneration:\n${reviewerGuidance.trim().slice(0, 1000)}\nApply this guidance to the copy while preserving the article title and output shape.`
+    : "";
+  const prompt = `Article title (preserve exactly): ${article.title}\nCategory: ${article.category}\n\nBody:\n${(article.body || article.excerpt).slice(0, 4000)}${feedbackContext}${guidanceContext}`;
   let response: Response;
   if (settings.provider === "anthropic") {
     response = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" }, body: JSON.stringify({ model: settings.model, max_tokens: 900, system: systemPrompt, messages: [{ role: "user", content: prompt }] }) });
@@ -40,9 +43,9 @@ async function generateWithProvider(article: SourceArticle): Promise<GeneratedSo
   return validateGeneratedPost({ ...generatedSocialPostSchema.parse(parsed), article_title: article.title }, article.title);
 }
 
-export async function generateSocialPost(article: SourceArticle): Promise<GeneratedSocialPost> {
+export async function generateSocialPost(article: SourceArticle, reviewerGuidance?: string): Promise<GeneratedSocialPost> {
   try {
-    return await generateWithProvider(article);
+    return await generateWithProvider(article, reviewerGuidance);
   } catch {
     return createLocalPost(article);
   }

@@ -52,10 +52,10 @@ type TitleLine = { text: string; start: number; end: number };
 const titleMaxWidth = 930;
 // Keep every element inside a safe inset from the black panel. The panel starts
 // lower on the canvas so the source image remains the visual anchor.
-const blackBoxTop = 800;
+const blackBoxTop = 850;
 const blackBoxBottom = 1350;
-const blackBoxPaddingTop = 54;
-const blackBoxPaddingBottom = 76;
+const blackBoxPaddingTop = 46;
+const blackBoxPaddingBottom = 58;
 const titleMaxHeight = blackBoxBottom - blackBoxTop - blackBoxPaddingTop - blackBoxPaddingBottom - 100;
 
 function estimatedWidth(text: string, fontSize: number) {
@@ -158,7 +158,7 @@ export async function renderTemplateGraphic(input: GraphicInput) {
             backgroundImage: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.08) 18%, rgba(0,0,0,0.68) 62%, rgba(0,0,0,0.98) 100%)"
           }}
         />
-        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: blackBoxBottom - blackBoxTop, background: "rgba(0,0,0,0.88)" }} />
+        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: blackBoxBottom - blackBoxTop, background: "rgba(0,0,0,0.76)" }} />
         <Logo src={logoData} />
         <div
           style={{
