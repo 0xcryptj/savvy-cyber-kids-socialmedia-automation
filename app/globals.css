@@ -29,3 +29,4 @@ h1,h2,h3{font-family:Asap,Arial,sans-serif;font-weight:600}
 .sticker{font-family:"Sketch Block Bold",Asap,Arial,sans-serif;font-weight:700}
 .metric strong{font-family:Asap,Arial,sans-serif;font-weight:600}
 .sidebar-callout strong{font-family:Asap,Arial,sans-serif;font-weight:600}
+.queue-item-rejected{background:#fff0ed;color:#b14e42}.review-rejected{padding:10px 14px;background:#fff0ed;border:1px solid #efb6aa;border-radius:5px;color:#b14e42;font-size:12px;font-weight:800}.status-rejected{color:#b14e42!important;background:#fff0ed!important}

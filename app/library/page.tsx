@@ -10,9 +10,10 @@ export default async function LibraryPage() {
   ]);
   const blog = blogResult.status === "fulfilled" ? blogResult.value : [];
   const news = newsResult.status === "fulfilled" ? newsResult.value : [];
-  const error = blogResult.status === "rejected" && newsResult.status === "rejected"
-    ? "The live source pages could not be reached. Check the connection and try again."
-    : undefined;
+  const errors = {
+    ...(blogResult.status === "rejected" ? { blog: blogResult.reason instanceof Error ? blogResult.reason.message : "Could not load blog sources" } : {}),
+    ...(newsResult.status === "rejected" ? { news: newsResult.reason instanceof Error ? newsResult.reason.message : "Could not load news sources" } : {})
+  };
 
-  return <><LibraryClient blog={blog} news={news} />{error ? <div className="card empty">{error}</div> : null}</>;
+  return <LibraryClient blog={blog} news={news} initialErrors={errors} />;
 }

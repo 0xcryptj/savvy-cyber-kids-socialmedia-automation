@@ -31,14 +31,14 @@ function ArticleCard({ article, onCreate, busy }: { article: SourceArticle; onCr
   );
 }
 
-export function LibraryClient({ blog, news }: { blog: SourceArticle[]; news: SourceArticle[] }) {
+export function LibraryClient({ blog, news, initialErrors = {} }: { blog: SourceArticle[]; news: SourceArticle[]; initialErrors?: Partial<Record<ContentCategory, string>> }) {
   const router = useRouter();
   const [tab, setTab] = useState<ContentCategory>("blog");
   const [liveBlog, setLiveBlog] = useState(blog);
   const [liveNews, setLiveNews] = useState(news);
   const [busy, setBusy] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(Object.entries(initialErrors).map(([category, message]) => `${category}: ${message}`).join(" | ") || null);
   const articles = tab === "blog" ? liveBlog : liveNews;
   const config = feedConfig[tab];
   const counts = useMemo(() => ({ blog: liveBlog.length, news: liveNews.length }), [liveBlog, liveNews]);
@@ -50,6 +50,8 @@ export function LibraryClient({ blog, news }: { blog: SourceArticle[]; news: Sou
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Could not sync sources");
       setLiveBlog(payload.blog ?? []); setLiveNews(payload.news ?? []);
+      const sourceErrors = payload.errors ? Object.entries(payload.errors).map(([category, message]) => `${category}: ${message}`).join(" | ") : "";
+      setError(sourceErrors || null);
     } catch (err) { setError(err instanceof Error ? err.message : "Could not sync sources"); }
     finally { setSyncing(false); }
   }
