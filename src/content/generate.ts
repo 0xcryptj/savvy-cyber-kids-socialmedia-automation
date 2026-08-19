@@ -10,7 +10,7 @@ export function finalizeGeneratedPost(input: GeneratedSocialPost) {
   return buildFinalPost(input);
 }
 
-const systemPrompt = `Create a warm, practical Savvy Cyber Kids social post for families. Preserve the article title exactly. Return exactly two topical hashtags; do not include #savvycyberkids or #cyberhero. Respond with JSON only matching this shape: {"topic_heading":"string","article_title":"string","caption":"string","hashtags":["#tag1","#tag2"]}.`;
+const systemPrompt = `Create a warm, practical Savvy Cyber Kids social post for families. Preserve the article title exactly. Use plain text only: do not use emojis or decorative symbols. Return exactly two topical hashtags; do not include #savvycyberkids or #cyberhero. Respond with JSON only matching this shape: {"topic_heading":"string","article_title":"string","caption":"string","hashtags":["#tag1","#tag2"]}.`;
 
 async function apiKey(provider: "openai" | "anthropic" | "openai-compatible") {
   const stored = await getStoredCredential(provider);

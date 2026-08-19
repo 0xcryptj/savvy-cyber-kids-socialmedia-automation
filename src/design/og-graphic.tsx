@@ -27,14 +27,18 @@ async function resolveImageSource(imageUrl?: string) {
     if (parsed.protocol === "data:" && parsed.pathname.startsWith("image/")) return imageUrl;
     if (!["http:", "https:"].includes(parsed.protocol) || /^(localhost|127\.|0\.0\.0\.0|::1|169\.254\.)/i.test(parsed.hostname)) return undefined;
     const response = await fetch(parsed, {
-      headers: { Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8" },
+      headers: {
+        Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        "User-Agent": "SavvyCyberKidsGraphicRenderer/1.0",
+        Referer: `${parsed.origin}/`
+      },
       redirect: "follow",
       signal: AbortSignal.timeout(15000)
     });
     if (!response.ok) return undefined;
     const mimeType = response.headers.get("content-type")?.split(";", 1)[0].toLowerCase() || "image/jpeg";
     const data = Buffer.from(await response.arrayBuffer()).toString("base64");
-    const extensionLooksLikeImage = /\.(avif|gif|jpe?g|png|svg|webp)(?:$|[?#])/i.test(parsed.pathname);
+    const extensionLooksLikeImage = /\.(avif|gif|jpe?g|png|svg|webp)(?:$|[?#])/i.test(parsed.pathname) || /\.(avif|gif|jpe?g|png|svg|webp)(?:$|[?#])/i.test(new URL(response.url).pathname);
     if (!mimeType.startsWith("image/") && !extensionLooksLikeImage) return undefined;
     return `data:${mimeType.startsWith("image/") ? mimeType : "image/jpeg"};base64,${data}`;
   } catch {
@@ -52,10 +56,10 @@ type TitleLine = { text: string; start: number; end: number };
 const titleMaxWidth = 930;
 // Keep every element inside a safe inset from the black panel. The panel starts
 // lower on the canvas so the source image remains the visual anchor.
-const blackBoxTop = 850;
+const blackBoxTop = 870;
 const blackBoxBottom = 1350;
-const blackBoxPaddingTop = 46;
-const blackBoxPaddingBottom = 58;
+const blackBoxPaddingTop = 48;
+const blackBoxPaddingBottom = 64;
 const titleMaxHeight = blackBoxBottom - blackBoxTop - blackBoxPaddingTop - blackBoxPaddingBottom - 100;
 
 function estimatedWidth(text: string, fontSize: number) {
@@ -147,7 +151,7 @@ export async function renderTemplateGraphic(input: GraphicInput) {
           fontFamily: canvaTemplate.layout.fontFace
         }}
       >
-        {imageSource ? <img src={imageSource} alt="" width={canvaTemplate.width} height={canvaTemplate.height} style={{ position: "absolute", inset: 0, width: canvaTemplate.width, height: canvaTemplate.height, objectFit: "cover" }} /> : null}
+        {imageSource ? <img src={imageSource} alt="" width={canvaTemplate.width} height={canvaTemplate.height} style={{ position: "absolute", inset: 0, width: canvaTemplate.width, height: canvaTemplate.height, objectFit: "cover", objectPosition: "center center", transform: "scale(0.91)" }} /> : <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: canvaTemplate.colors.darkBlue, color: "rgba(255,255,255,0.82)", fontFamily: canvaTemplate.layout.fontFace, fontSize: 28, letterSpacing: 3 }}>IMAGE UNAVAILABLE</div>}
         <div
           style={{
             position: "absolute",
@@ -158,7 +162,7 @@ export async function renderTemplateGraphic(input: GraphicInput) {
             backgroundImage: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.08) 18%, rgba(0,0,0,0.68) 62%, rgba(0,0,0,0.98) 100%)"
           }}
         />
-        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: blackBoxBottom - blackBoxTop, background: "rgba(0,0,0,0.76)" }} />
+        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: blackBoxBottom - blackBoxTop, background: "rgba(0,0,0,0.68)" }} />
         <Logo src={logoData} />
         <div
           style={{

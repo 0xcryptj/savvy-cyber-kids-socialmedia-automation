@@ -1,6 +1,12 @@
 import { contentRules } from "@/config/content-rules";
 import { FinalSocialPost, GeneratedSocialPost, finalSocialPostSchema, generatedSocialPostSchema } from "./schema";
 
+const emojiPattern = /[\p{Extended_Pictographic}\uFE0F]/gu;
+
+export function removeCaptionEmojis(value: string): string {
+  return value.replace(emojiPattern, "").replace(/[ \t]{2,}/g, " ").trim();
+}
+
 export function validateGeneratedPost(input: unknown, originalTitle: string): GeneratedSocialPost {
   const parsed = generatedSocialPostSchema.parse(input);
   if (parsed.article_title !== originalTitle) throw new Error("Generated output changed the original article title");
@@ -11,7 +17,7 @@ export function validateGeneratedPost(input: unknown, originalTitle: string): Ge
 }
 
 export function buildFinalPost(input: GeneratedSocialPost): FinalSocialPost {
-  return finalSocialPostSchema.parse({ ...input, hashtags: [...input.hashtags, ...contentRules.hashtags.required] });
+  return finalSocialPostSchema.parse({ ...input, caption: removeCaptionEmojis(input.caption), hashtags: [...input.hashtags, ...contentRules.hashtags.required] });
 }
 
 export function validateEditableHashtags(input: unknown): string[] {
