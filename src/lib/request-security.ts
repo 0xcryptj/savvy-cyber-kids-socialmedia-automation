@@ -4,7 +4,11 @@ export function sameOrigin(request: NextRequest): NextResponse | null {
   const origin = request.headers.get("origin");
   if (!origin) return null;
   try {
-    if (new URL(origin).host !== request.nextUrl.host) {
+    const originUrl = new URL(origin);
+    const requestUrl = new URL(request.url);
+    const loopbackHosts = new Set(["localhost", "127.0.0.1", "::1"]);
+    const sameLoopback = loopbackHosts.has(originUrl.hostname) && loopbackHosts.has(requestUrl.hostname) && originUrl.port === requestUrl.port;
+    if (originUrl.host !== requestUrl.host && !sameLoopback) {
       return NextResponse.json({ error: "Cross-origin requests are not allowed" }, { status: 403 });
     }
   } catch {
