@@ -20,7 +20,7 @@ function PlatformIcon({ label }: { label: string }) {
 export default function ReviewPage() {
   const [post, setPost] = useState<WorkspacePost | null>(null);
   const [reviewQueue, setReviewQueue] = useState<WorkspacePost[]>([]);
-  const [caption, setCaption] = useState("");
+  const [copy, setCopy] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -37,7 +37,7 @@ export default function ReviewPage() {
         setReviewQueue(queryId ? [] : allPosts.filter((item: WorkspacePost) => ["PENDING_REVIEW", "REVISION", "APPROVED"].includes(item.status)));
         const next = queryId ? payload : allPosts.find((item: WorkspacePost) => ["PENDING_REVIEW", "REVISION"].includes(item.status));
         setPost(next ?? null);
-        setCaption(next?.caption ?? "");
+        setCopy(next ? `${next.caption}\n\n${next.hashtags.join(" ")}` : "");
       }
       setLoading(false);
     })();
@@ -46,16 +46,20 @@ export default function ReviewPage() {
   async function transition(status: WorkspacePost["status"]) {
     if (!post) return;
     setTransitioning(true); setError(null);
-    const response = await fetch(`/api/posts/${post.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status, caption }) });
+    const lines = copy.trim().split(/\r?\n/);
+    const hashtagLine = lines.at(-1) || "";
+    const hashtags = hashtagLine.split(/\s+/).filter(Boolean);
+    const caption = lines.slice(0, -1).join("\n").trim();
+    const response = await fetch(`/api/posts/${post.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status, caption, hashtags }) });
     const payload = await response.json();
     if (!response.ok) setError(payload.error);
-    else { setPost(payload); setReviewQueue(current => current.map(item => item.id === payload.id ? payload : item)); }
+    else { setPost(payload); setCopy(`${payload.caption}\n\n${payload.hashtags.join(" ")}`); setReviewQueue(current => current.map(item => item.id === payload.id ? payload : item)); }
     setTransitioning(false);
   }
 
   async function sharePost() {
     if (!post) return;
-    const finalCopy = `${caption}\n\n${post.hashtags.join(" ")}`;
+    const finalCopy = copy;
     try {
       const response = await fetch(post.graphicPath);
       const blob = await response.blob();
@@ -75,7 +79,7 @@ export default function ReviewPage() {
 
   async function quickPlatformPost(label: string) {
     if (!post) return;
-    const finalCopy = `${caption}\n\n${post.hashtags.join(" ")}`;
+    const finalCopy = copy;
     await navigator.clipboard?.writeText(`${finalCopy}\n\nGraphic: ${window.location.origin}${post.graphicPath}`);
     window.open(shareUrl(label, post.externalUrl || post.sourceUrl), "_blank", "noopener,noreferrer");
     setShareMessage(`${label} post copy and graphic link copied.`);
@@ -91,7 +95,7 @@ export default function ReviewPage() {
     {reviewQueue.length ? <div className="card review-queue"><div className="review-queue-heading"><div><p className="eyebrow">YOUR REVIEW QUEUE</p><h3>{reviewQueue.filter(item => item.status !== "APPROVED").length} waiting for approval</h3></div><span className="mini-label">Approved posts stay logged here</span></div><div className="review-queue-list">{reviewQueue.map(item=><a key={item.id} className={`review-queue-item ${item.id === post.id ? "selected" : ""}`} href={`/review?id=${item.id}`}><span className="queue-item-icon">{item.status === "APPROVED" ? "✓" : "•"}</span><span><strong>{item.topicHeading}</strong><small>{item.articleTitle}</small></span><span className={`status ${item.status === "APPROVED" ? "status-published" : ""}`}>{item.status.replace("_", " ")}</span></a>)}</div></div> : null}
     <div className="review-layout">
       <article className="card preview-card">
-        <div className="post-main"><div className="graphic"><Image src={post.graphicPath} alt="Savvy Cyber Kids social post preview" width={1080} height={1350} sizes="(max-width: 900px) 100vw, 55vw" priority /></div><div className="post-copy"><span className="status">{post.status.replace("_", " ")}</span><h2>{post.topicHeading}</h2><p className="meta">{new Date(post.publishedAt).toLocaleDateString()} · <a href={post.externalUrl || post.sourceUrl} target="_blank" rel="noreferrer">Open source article ↗</a></p><h3>{post.articleTitle}</h3><label className="caption-label" htmlFor="caption">Caption</label><textarea className="edit-area" id="caption" value={caption} onChange={e=>setCaption(e.target.value)} /><p className="hashtags">{post.hashtags.join("  ")}</p></div></div>
+        <div className="post-main"><div className="graphic"><Image src={post.graphicPath} alt="Savvy Cyber Kids social post preview" width={1080} height={1350} sizes="(max-width: 900px) 100vw, 55vw" priority /></div><div className="post-copy"><span className="status">{post.status.replace("_", " ")}</span><h2>{post.topicHeading}</h2><p className="meta">{new Date(post.publishedAt).toLocaleDateString()} · <a href={post.externalUrl || post.sourceUrl} target="_blank" rel="noreferrer">Open source article ↗</a></p><h3>{post.articleTitle}</h3><label className="caption-label" htmlFor="copy">Caption + hashtags</label><textarea className="edit-area copy-editor" id="copy" value={copy} onChange={e=>setCopy(e.target.value)} /><small className="field-hint">Keep four hashtags on the final line. The two required Savvy Cyber Kids tags stay included.</small></div></div>
         <div className="actions">{["PENDING_REVIEW", "REVISION"].includes(post.status) ? <><button onClick={()=>transition("APPROVED")} disabled={transitioning}>{transitioning ? <Spinner label="Saving…" /> : "Approve"}</button><button className="secondary" onClick={()=>transition("REVISION")} disabled={transitioning}>Save edit</button><button className="outline" onClick={()=>transition("REJECTED")} disabled={transitioning}>Reject</button></> : <span className="review-complete">✓ Approved and kept in the review log</span>}</div>
       </article>
       <div className="side-stack">

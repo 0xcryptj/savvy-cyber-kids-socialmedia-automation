@@ -24,6 +24,8 @@ export const canvaTemplate = {
     overlay: "bottomBlackGradient",
     topicHeading: "aboveLine",
     articleTitle: "belowLine",
-    highlightColor: "#00aeef"
+    dividerColor: "#f7941d",
+    highlightColor: "#00aeef",
+    fontFace: "Asap"
   }
 } as const;

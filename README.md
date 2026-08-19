@@ -118,13 +118,19 @@ AUTO_PUBLISH=false
 - Canva and SocialBee settings are reserved for their connector workflows.
 - Keep `AUTO_PUBLISH=false` while testing. Approval remains required.
 
+### Easiest SocialBee setup: Make.com
+
+The supported path is a single Make scenario: **Custom webhook → SocialBee / Create a Post**. The app sends the approved caption, individual hashtags, generated graphic URL, post ID, and optional SocialBee workspace ID. Follow the complete field-mapping checklist in [`docs/connectors.md`](docs/connectors.md).
+
+Because Make runs in the cloud, it cannot download an image from `localhost`. For image publishing during local testing, expose the development server through a temporary HTTPS tunnel and set `APP_PUBLIC_URL` to that tunnel origin. Keep the scenario in draft mode until the first test post is confirmed in SocialBee.
+
 ## Using the app
 
 1. Open **Library** and choose Blog content or News feed.
 2. Select **Create social post** on an article.
 3. Wait for the writing and graphic processing indicators to finish.
 4. Open **Review post**. The Pending Review card on the dashboard opens the complete review queue.
-5. Edit the caption if needed, then approve, save for revision, or reject.
+5. Edit the caption and all four hashtags together in the **Caption + hashtags** field, then approve, save for revision, or reject. Keep hashtags on the final line; the two required Savvy Cyber Kids tags must remain included.
 6. Approved posts remain visible in the review log and appear in **Ready to post**.
 7. Use **Mark as posted** only after the configured outbound handoff succeeds.
 8. Review completed handoffs in **Published history**.
@@ -140,6 +146,12 @@ The quick-post controls can also copy the caption, hashtags, and graphic link fo
 - `.env` contains local secrets and is ignored by Git.
 
 This is intentionally file-backed local persistence. It is convenient for testing and single-user use; it is not a multi-user production credential vault. Do not expose this development server directly to the public internet.
+
+## Template fidelity
+
+The local renderer follows the specification recorded in `config/template.ts`: 1080×1350 (4:5), Asap, the supplied Savvy Cyber Kids logo, full-bleed article imagery, the black gradient treatment, and the exact black, white, orange, light-blue, medium-blue, and dark-blue color tokens. Dynamic topic headings and article titles are fitted into that same layout. Editable social copy remains separate from the branded image composition.
+
+The connected Canva file contains 24 pages. The current local layout maps to the general article treatment; the source template also includes Online Behavior, Conversation Starters, and Breaking News variants. Those variants are documented in [`docs/connectors.md`](docs/connectors.md) so they can be added as explicit renderer choices without guessing at the design. Canva asset references are retained as source metadata rather than bulk-copied into Git because some images and fonts may be private or licensed for Canva-only use.
 
 ## Useful commands
 
@@ -217,6 +229,13 @@ src/integrations/     Make.com, Canva, SocialBee, and provider boundaries
 config/               Source URLs, feed rules, platform links, and content rules
 docs/                 Architecture, connector, and workflow notes
 ```
+
+## Integration status
+
+- AI writing: configurable OpenAI, Anthropic, or OpenAI-compatible provider.
+- Canva: connected template specifications documented; local renderer remains deterministic and human-reviewable.
+- Make.com: implemented approved-post webhook handoff with SocialBee-ready payload fields.
+- SocialBee: no direct public API client is assumed; use Make’s supported SocialBee module.
 
 ## Safety defaults
 

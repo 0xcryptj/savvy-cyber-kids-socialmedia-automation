@@ -13,3 +13,11 @@ export function validateGeneratedPost(input: unknown, originalTitle: string): Ge
 export function buildFinalPost(input: GeneratedSocialPost): FinalSocialPost {
   return finalSocialPostSchema.parse({ ...input, hashtags: [...input.hashtags, ...contentRules.hashtags.required] });
 }
+
+export function validateEditableHashtags(input: unknown): string[] {
+  const parsed = finalSocialPostSchema.shape.hashtags.parse(input);
+  for (const required of contentRules.hashtags.required) {
+    if (!parsed.includes(required)) throw new Error(`The required hashtag ${required} cannot be removed`);
+  }
+  return parsed;
+}
