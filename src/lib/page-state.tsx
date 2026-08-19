@@ -1,1 +1,0 @@
-export function EmptyPage({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) { return <><div className="page-intro"><div><p className="eyebrow">{eyebrow}</p><h2>{title}</h2><p>{description}</p></div></div><div className="card empty">Nothing here yet.</div></> }
