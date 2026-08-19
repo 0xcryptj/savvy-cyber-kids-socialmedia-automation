@@ -27,10 +27,12 @@ export const canvaTemplate = {
   layout: {
     photo: "fullBleedBackground",
     logo: "topRight",
-    logoWidth: 132,
-    logoHeight: 115,
-    logoTop: 38,
-    logoRight: 64,
+    // Canva reference proportions: the bundled logo is low-resolution (172×150)
+    // but is intentionally scaled here; replace the asset later without changing layout code.
+    logoWidth: 240,
+    logoHeight: 202,
+    logoTop: 87,
+    logoRight: 74,
     overlay: "bottomBlackGradient",
     topicHeading: "aboveLine",
     articleTitle: "belowLine",
