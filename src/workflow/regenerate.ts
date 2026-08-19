@@ -48,7 +48,7 @@ export async function regeneratePost(id: string): Promise<WorkspacePost> {
     sourceUrl: article.sourceUrl,
     externalUrl: article.externalUrl,
     featuredImageUrl: article.featuredImageUrl,
-    graphicPath: `/api/graphic/${nextId}?v=${Date.now()}`,
+    graphicPath: `/api/graphic/${nextId}`,
     createdAt: new Date().toISOString(),
     approvedAt: undefined,
     queuedAt: undefined,

@@ -50,7 +50,13 @@ type TitleWord = { text: string; start: number; end: number };
 type TitleLine = { text: string; start: number; end: number };
 
 const titleMaxWidth = 930;
-const titleMaxHeight = 385;
+// Keep every element inside a safe inset from the black panel. The panel starts
+// lower on the canvas so the source image remains the visual anchor.
+const blackBoxTop = 800;
+const blackBoxBottom = 1350;
+const blackBoxPaddingTop = 54;
+const blackBoxPaddingBottom = 76;
+const titleMaxHeight = blackBoxBottom - blackBoxTop - blackBoxPaddingTop - blackBoxPaddingBottom - 100;
 
 function estimatedWidth(text: string, fontSize: number) {
   let units = 0;
@@ -152,25 +158,25 @@ export async function renderTemplateGraphic(input: GraphicInput) {
             backgroundImage: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.08) 18%, rgba(0,0,0,0.68) 62%, rgba(0,0,0,0.98) 100%)"
           }}
         />
-        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 620, background: "rgba(0,0,0,0.88)" }} />
+        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: blackBoxBottom - blackBoxTop, background: "rgba(0,0,0,0.88)" }} />
         <Logo src={logoData} />
         <div
           style={{
             position: "absolute",
             left: 56,
             right: 56,
-            top: 790,
-            bottom: 82,
+            top: blackBoxTop + blackBoxPaddingTop,
+            bottom: blackBoxPaddingBottom,
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "flex-start"
           }}
         >
-          <div style={{ color: "rgba(255,255,255,0.96)", fontFamily: canvaTemplate.layout.fontFace, fontSize: headingScale(heading), fontWeight: canvaTemplate.fontWeights.bold, letterSpacing: 2.5, textAlign: "center", marginBottom: 18, padding: "0 20px" }}>
+          <div style={{ color: "rgba(255,255,255,0.96)", fontFamily: canvaTemplate.layout.fontFace, fontSize: headingScale(heading), fontWeight: canvaTemplate.fontWeights.bold, letterSpacing: 2.5, textAlign: "center", marginBottom: 22, padding: "0 20px" }}>
             {heading}
           </div>
-          <div style={{ width: 860, height: 3, background: canvaTemplate.layout.dividerColor, marginBottom: 24 }} />
+          <div style={{ width: 860, height: 3, background: canvaTemplate.layout.dividerColor, marginBottom: 28 }} />
           <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-start", textAlign: "center", fontFamily: canvaTemplate.layout.fontFace, fontSize: scaledTitle.fontSize, fontWeight: canvaTemplate.fontWeights.bold, lineHeight: `${scaledTitle.lineHeight}px`, textTransform: "uppercase", maxWidth: titleMaxWidth, padding: "0 12px" }}>
             {scaledTitle.lines.map((line) => <div key={`${line.start}-${line.end}`} style={{ display: "flex", justifyContent: "center" }}>{lineSegments(line, scaledTitle.highlightStart, scaledTitle.highlightEnd).map((segment, index) => <span key={`${line.start}-${index}`} style={{ color: segment.highlighted ? canvaTemplate.colors.lightBlue : canvaTemplate.colors.white }}>{segment.text}</span>)}</div>)}
           </div>
