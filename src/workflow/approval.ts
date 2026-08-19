@@ -1,5 +1,5 @@
 import { assertTransition, PostStatus } from "./state";
-import { getPost, savePost } from "@/src/workspace/store";
+import { getPost, recordFeedback, savePost } from "@/src/workspace/store";
 import { WorkspacePost } from "@/src/workspace/types";
 
 export function approve(status: PostStatus): PostStatus {
@@ -24,16 +24,18 @@ const stamps: Partial<Record<PostStatus, keyof WorkspacePost>> = {
   PUBLISHED: "publishedAt"
 };
 
-export async function transitionPost(id: string, next: PostStatus, patch?: Partial<WorkspacePost>): Promise<WorkspacePost> {
+export async function transitionPost(id: string, next: PostStatus, patch?: Partial<WorkspacePost>, feedbackNote?: string): Promise<WorkspacePost> {
   const post = await getPost(id);
   if (!post) throw new Error("Post not found");
   if (post.status === next) return savePost({ ...post, ...patch });
   assertTransition(post.status, next);
   const stamp = stamps[next];
-  return savePost({
+  const updated = await savePost({
     ...post,
     ...patch,
     status: next,
     ...(stamp ? { [stamp]: new Date().toISOString() } : {})
   });
+  if (next === "APPROVED" || next === "REJECTED") await recordFeedback({ postId: updated.id, category: updated.category, status: next, topicHeading: updated.topicHeading, articleTitle: updated.articleTitle, note: feedbackNote?.trim() || undefined, createdAt: new Date().toISOString() });
+  return updated;
 }

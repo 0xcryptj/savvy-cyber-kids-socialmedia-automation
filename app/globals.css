@@ -29,4 +29,5 @@ h1,h2,h3{font-family:Asap,Arial,sans-serif;font-weight:600}
 .sticker{font-family:"Sketch Block Bold",Asap,Arial,sans-serif;font-weight:700}
 .metric strong{font-family:Asap,Arial,sans-serif;font-weight:600}
 .sidebar-callout strong{font-family:Asap,Arial,sans-serif;font-weight:600}
+.graphic{position:relative}.graphic-loading{background:#102c4a}.graphic-status{position:absolute;z-index:2;inset:0;display:grid;place-items:center;align-content:center;gap:12px;padding:24px;text-align:center;background:rgba(16,44,74,.86);color:#fff;font-size:13px}.graphic-status .spinner{width:24px;height:24px;border-width:3px}.regenerate-button{width:100%;margin-bottom:10px}
 .queue-item-rejected{background:#fff0ed;color:#b14e42}.review-rejected{padding:10px 14px;background:#fff0ed;border:1px solid #efb6aa;border-radius:5px;color:#b14e42;font-size:12px;font-weight:800}.status-rejected{color:#b14e42!important;background:#fff0ed!important}

@@ -25,6 +25,10 @@ export default function ReviewPage() {
   const [shareMessage, setShareMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [transitioning, setTransitioning] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const [graphicLoading, setGraphicLoading] = useState(true);
+  const [graphicError, setGraphicError] = useState(false);
+  const [feedbackNote, setFeedbackNote] = useState("");
 
   useEffect(() => {
     const queryId = new URLSearchParams(window.location.search).get("id");
@@ -38,6 +42,7 @@ export default function ReviewPage() {
         const next = queryId ? payload : allPosts.find((item: WorkspacePost) => ["PENDING_REVIEW", "REVISION"].includes(item.status));
         setPost(next ?? null);
         setCopy(next ? `${next.caption}\n\n${next.hashtags.join(" ")}` : "");
+        setGraphicLoading(Boolean(next));
       }
       setLoading(false);
     })();
@@ -50,11 +55,29 @@ export default function ReviewPage() {
     const hashtagLine = lines.at(-1) || "";
     const hashtags = hashtagLine.split(/\s+/).filter(Boolean);
     const caption = lines.slice(0, -1).join("\n").trim();
-    const response = await fetch(`/api/posts/${post.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status, caption, hashtags }) });
+    const response = await fetch(`/api/posts/${post.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status, caption, hashtags, feedbackNote }) });
     const payload = await response.json();
     if (!response.ok) setError(payload.error);
     else { setPost(payload); setCopy(`${payload.caption}\n\n${payload.hashtags.join(" ")}`); setReviewQueue(current => current.map(item => item.id === payload.id ? payload : item)); }
     setTransitioning(false);
+  }
+
+  async function regenerate() {
+    if (!post || regenerating) return;
+    setRegenerating(true); setGraphicLoading(true); setGraphicError(false); setError(null);
+    try {
+      const response = await fetch(`/api/posts/${post.id}/regenerate`, { method: "POST" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Regeneration failed");
+      setPost(payload); setCopy(`${payload.caption}\n\n${payload.hashtags.join(" ")}`); setFeedbackNote("");
+      setReviewQueue(current => [payload, ...current]);
+      window.history.replaceState({}, "", `/review?id=${payload.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Regeneration failed");
+      setGraphicLoading(false);
+    } finally {
+      setRegenerating(false);
+    }
   }
 
   async function sharePost() {
@@ -95,12 +118,12 @@ export default function ReviewPage() {
     {reviewQueue.length ? <div className="card review-queue"><div className="review-queue-heading"><div><p className="eyebrow">YOUR REVIEW QUEUE</p><h3>{reviewQueue.filter(item => !["APPROVED", "REJECTED"].includes(item.status)).length} waiting for approval</h3></div><span className="mini-label">Approved and rejected posts stay logged here</span></div><div className="review-queue-list">{reviewQueue.map(item=><a key={item.id} className={`review-queue-item ${item.id === post.id ? "selected" : ""}`} href={`/review?id=${item.id}`}><span className={`queue-item-icon ${item.status === "REJECTED" ? "queue-item-rejected" : ""}`}>{item.status === "APPROVED" ? "✓" : item.status === "REJECTED" ? "×" : "•"}</span><span><strong>{item.topicHeading}</strong><small>{item.articleTitle}</small></span><span className={`status ${item.status === "APPROVED" ? "status-published" : item.status === "REJECTED" ? "status-rejected" : ""}`}>{item.status.replace("_", " ")}</span></a>)}</div></div> : null}
     <div className="review-layout">
       <article className="card preview-card">
-        <div className="post-main"><div className="graphic"><Image src={post.graphicPath} alt="Savvy Cyber Kids social post preview" width={1080} height={1350} sizes="(max-width: 900px) 100vw, 55vw" priority /></div><div className="post-copy"><span className={post.status === "REJECTED" ? "status status-rejected" : "status"}>{post.status.replace("_", " ")}</span><h2>{post.topicHeading}</h2><p className="meta">{new Date(post.publishedAt).toLocaleDateString()} · <a href={post.externalUrl || post.sourceUrl} target="_blank" rel="noreferrer">Open source article ↗</a></p><h3>{post.articleTitle}</h3><label className="caption-label" htmlFor="copy">Caption + hashtags</label><textarea className="edit-area copy-editor" id="copy" value={copy} onChange={e=>setCopy(e.target.value)} /><small className="field-hint">Keep four hashtags on the final line. The two required Savvy Cyber Kids tags stay included.</small></div></div>
+        <div className="post-main"><div className={graphicLoading ? "graphic graphic-loading" : "graphic"}>{graphicLoading ? <div className="graphic-status"><Spinner label={regenerating ? "Regenerating…" : "Rendering branded graphic…"} /></div> : null}{graphicError ? <div className="graphic-status error-panel">Graphic rendering failed. Try regenerate.</div> : null}<Image src={post.graphicPath} alt="Savvy Cyber Kids social post preview" width={1080} height={1350} sizes="(max-width: 900px) 100vw, 55vw" priority onLoad={() => setGraphicLoading(false)} onError={() => { setGraphicLoading(false); setGraphicError(true); }} /></div><div className="post-copy"><span className={post.status === "REJECTED" ? "status status-rejected" : "status"}>{post.status.replace("_", " ")}</span><h2>{post.topicHeading}</h2><p className="meta">{new Date(post.publishedAt).toLocaleDateString()} · <a href={post.externalUrl || post.sourceUrl} target="_blank" rel="noreferrer">Open source article ↗</a></p><h3>{post.articleTitle}</h3><label className="caption-label" htmlFor="copy">Caption + hashtags</label><textarea className="edit-area copy-editor" id="copy" value={copy} onChange={e=>setCopy(e.target.value)} /><small className="field-hint">Keep four hashtags on the final line. The two required Savvy Cyber Kids tags stay included.</small><label className="caption-label" htmlFor="feedback-note">Optional improvement note</label><textarea className="edit-area feedback-note" id="feedback-note" value={feedbackNote} onChange={e=>setFeedbackNote(e.target.value)} placeholder="What should improve next time?" maxLength={1000} /></div></div>
         <div className="actions">{["PENDING_REVIEW", "REVISION"].includes(post.status) ? <><button onClick={()=>transition("APPROVED")} disabled={transitioning}>{transitioning ? <Spinner label="Saving…" /> : "Approve"}</button><button className="secondary" onClick={()=>transition("REVISION")} disabled={transitioning}>Save edit</button><button className="outline" onClick={()=>transition("REJECTED")} disabled={transitioning}>Reject</button></> : post.status === "REJECTED" ? <span className="review-rejected">× Rejected and kept in the review log</span> : post.status === "APPROVED" ? <span className="review-complete">✓ Approved and kept in the review log</span> : <span className="review-complete">{post.status.replace("_", " ")}</span>}</div>
       </article>
       <div className="side-stack">
         <div className="card side-card quick-post-card"><p className="eyebrow">QUICK POST</p><h3>Post from your account</h3><p>Use your own logged-in account. No API setup or account connection is required.</p><button className="share-button" onClick={sharePost}>Share graphic + caption <span>↗</span></button><div className="platform-post-grid">{["Instagram", "Facebook", "LinkedIn", "X"].map(label=><button key={label} className="platform-post-button" onClick={()=>quickPlatformPost(label)}><PlatformIcon label={label} />{label}<span>↗</span></button>)}</div>{shareMessage ? <p className="copy-confirm">{shareMessage}</p> : null}</div>
-        <div className="card side-card"><p className="eyebrow">MEDIA PACKAGE</p><h3>Ready to download</h3><p>The source image is composed into the branded 4:5 template with the article title and topic heading.</p><div className="quick-links"><a href={post.graphicPath} download>Download finished graphic <span>↓</span></a><a href={post.externalUrl || post.sourceUrl} target="_blank" rel="noreferrer">Open source article <span>↗</span></a><a href={designUrls.canvaTemplate} target="_blank" rel="noreferrer">Open Canva template <span>↗</span></a></div></div>
+        <div className="card side-card"><p className="eyebrow">MEDIA PACKAGE</p><h3>Ready to download</h3><p>The source image is composed into the branded 4:5 template with the article title and topic heading.</p><button className="button secondary regenerate-button" onClick={regenerate} disabled={regenerating}>{regenerating ? <Spinner label="Regenerating post…" /> : "Regenerate post"}</button><div className="quick-links"><a href={post.graphicPath} download>Download finished graphic <span>↓</span></a><a href={post.externalUrl || post.sourceUrl} target="_blank" rel="noreferrer">Open source article <span>↗</span></a><a href={designUrls.canvaTemplate} target="_blank" rel="noreferrer">Open Canva template <span>↗</span></a></div></div>
       </div>
     </div>
   </>;

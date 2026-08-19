@@ -16,13 +16,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const originError = sameOrigin(request);
   if (originError) return originError;
   const { id } = await params;
-  const body = await request.json() as { status?: PostStatus; caption?: string; hashtags?: unknown };
+  const body = await request.json() as { status?: PostStatus; caption?: string; hashtags?: unknown; feedbackNote?: string };
   if (body.caption !== undefined && !boundedText(body.caption, 10000)) return NextResponse.json({ error: "Caption is too long" }, { status: 400 });
   try {
     const hashtags = body.hashtags === undefined ? undefined : validateEditableHashtags(body.hashtags);
     const patch = { ...(body.caption !== undefined ? { caption: body.caption } : {}), ...(hashtags ? { hashtags } : {}) };
     if (body.status) {
-      return NextResponse.json(await transitionPost(id, body.status, Object.keys(patch).length ? patch : undefined));
+      return NextResponse.json(await transitionPost(id, body.status, Object.keys(patch).length ? patch : undefined, boundedText(body.feedbackNote, 1000)));
     }
     const post = await getPost(id);
     if (!post) return NextResponse.json({ error: "Not found" }, { status: 404 });

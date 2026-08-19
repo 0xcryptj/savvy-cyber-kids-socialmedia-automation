@@ -152,7 +152,7 @@ export async function renderTemplateGraphic(input: GraphicInput) {
             backgroundImage: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.08) 18%, rgba(0,0,0,0.68) 62%, rgba(0,0,0,0.98) 100%)"
           }}
         />
-        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 620, background: "rgba(0,0,0,0.96)" }} />
+        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 620, background: "rgba(0,0,0,0.88)" }} />
         <Logo src={logoData} />
         <div
           style={{

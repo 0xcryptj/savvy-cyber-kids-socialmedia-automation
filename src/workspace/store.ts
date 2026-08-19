@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { revalidateTag, unstable_cache } from "next/cache";
 import { PostStatus } from "@/src/workflow/state";
-import { WorkspacePost, WorkspaceState } from "./types";
+import { WorkspaceFeedback, WorkspacePost, WorkspaceState } from "./types";
 
 const filePath = path.join(process.cwd(), "storage/workspace.json");
 
@@ -53,4 +53,15 @@ export async function countsByStatus(): Promise<Record<string, number>> {
     counts[post.status] = (counts[post.status] ?? 0) + 1;
     return counts;
   }, {});
+}
+
+export async function recordFeedback(feedback: WorkspaceFeedback): Promise<void> {
+  const state = await readState();
+  const entries = [...(state.feedback ?? []), feedback].slice(-100);
+  await writeState({ ...state, feedback: entries });
+}
+
+export async function recentFeedback(category?: WorkspaceFeedback["category"]): Promise<WorkspaceFeedback[]> {
+  const state = await readState();
+  return (state.feedback ?? []).filter((item) => !category || item.category === category).slice(-12).reverse();
 }

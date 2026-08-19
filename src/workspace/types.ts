@@ -24,4 +24,14 @@ export type WorkspacePost = {
   publishExternalId?: string;
 };
 
-export type WorkspaceState = { posts: WorkspacePost[] };
+export type WorkspaceFeedback = {
+  postId: string;
+  category: ContentCategory;
+  status: "APPROVED" | "REJECTED";
+  topicHeading: string;
+  articleTitle: string;
+  note?: string;
+  createdAt: string;
+};
+
+export type WorkspaceState = { posts: WorkspacePost[]; feedback?: WorkspaceFeedback[] };

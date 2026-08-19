@@ -4,6 +4,7 @@ import { createLocalPost } from "./local-copy";
 import { buildFinalPost, validateGeneratedPost } from "./validate";
 import { getAISettings } from "@/src/config/ai-settings";
 import { getStoredCredential } from "@/src/config/credentials";
+import { recentFeedback } from "@/src/workspace/store";
 
 export function finalizeGeneratedPost(input: GeneratedSocialPost) {
   return buildFinalPost(input);
@@ -20,7 +21,11 @@ async function generateWithProvider(article: SourceArticle): Promise<GeneratedSo
   const settings = await getAISettings();
   const key = await apiKey(settings.provider);
   if (!key) throw new Error(`${settings.provider} API key is not configured`);
-  const prompt = `Article title (preserve exactly): ${article.title}\nCategory: ${article.category}\n\nBody:\n${(article.body || article.excerpt).slice(0, 4000)}`;
+  const feedback = await recentFeedback(article.category);
+  const feedbackContext = feedback.length
+    ? `\n\nRecent human feedback from this feed:\n${feedback.map((item) => `- ${item.status}: ${item.note || "No note supplied"}`).join("\n")}\nUse this as guidance, but preserve the article title and the required output shape.`
+    : "";
+  const prompt = `Article title (preserve exactly): ${article.title}\nCategory: ${article.category}\n\nBody:\n${(article.body || article.excerpt).slice(0, 4000)}${feedbackContext}`;
   let response: Response;
   if (settings.provider === "anthropic") {
     response = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" }, body: JSON.stringify({ model: settings.model, max_tokens: 900, system: systemPrompt, messages: [{ role: "user", content: prompt }] }) });
