@@ -15,6 +15,8 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
     const result = await new ConfiguredMakeHandoff().sendApprovedPost({ postId: post.id, caption: post.caption, hashtags: post.hashtags, graphicPath: post.graphicPath });
     return NextResponse.json(await transitionPost(id, "PUBLISHED", { publishedVia: "Make.com", publishExternalId: result.externalId }));
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Handoff failed" }, { status: 400 });
+    const reason = error instanceof Error ? error.message : "Handoff failed";
+    const failed = await transitionPost(id, "FAILED", { failureReason: reason });
+    return NextResponse.json({ error: reason, post: failed }, { status: 400 });
   }
 }

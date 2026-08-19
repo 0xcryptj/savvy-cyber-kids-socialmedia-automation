@@ -1,0 +1,36 @@
+{
+  "_comment": "Starter blueprint for Savvy Cyber Kids. The SocialBee module field names and mapping IDs are intentionally placeholders: after import, open that module and remap them using the live fields Make displays. Do not rely on these placeholder field IDs.",
+  "subflows": [
+    {
+      "flow": [
+        {
+          "id": 1,
+          "module": "gateway:webhook",
+          "version": 1,
+          "parameters": { "hook": "SCK_SOCIALBEE_HANDOFF_WEBHOOK" },
+          "mapper": {},
+          "metadata": { "designer": { "x": 0, "y": 0 }, "restore": { "expect": { "hook": { "label": "SCK SocialBee handoff" } } } }
+        },
+        {
+          "id": 2,
+          "module": "socialbee:createPost",
+          "version": 1,
+          "parameters": { "workspace": "SOCIALBEE_WORKSPACE_PLACEHOLDER" },
+          "mapper": {
+            "text": "{{1.caption}} {{1.hashtags}}",
+            "link": "{{1.graphicUrl}}",
+            "imageUrls": "{{1.mediaUrl}}",
+            "postId": "{{1.postId}}",
+            "socialBeeWorkspaceId": "{{1.socialBeeWorkspaceId}}"
+          },
+          "metadata": {
+            "designer": { "x": 300, "y": 0 },
+            "restore": { "expect": { "workspace": { "label": "Connect SocialBee after import" } } },
+            "_comment": "DOUBLE-CHECK/RE-MAP THIS MODULE IN MAKE. SocialBee's exact module and field IDs are rendered by Make's UI and are not publicly documented; the mappings above are starter placeholders for the webhook keys caption, hashtags, graphicUrl, mediaUrl, postId, and socialBeeWorkspaceId."
+          }
+        }
+      ]
+    }
+  ],
+  "metadata": { "version": 1, "scenario": { "name": "Savvy Cyber Kids → SocialBee" } }
+}
