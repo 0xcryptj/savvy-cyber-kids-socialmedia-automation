@@ -22,6 +22,8 @@ export type WorkspacePost = {
   scheduledAt?: string;
   publishedVia?: string;
   publishExternalId?: string;
+  failureReason?: string;
+  usedFallbackSource?: boolean;
 };
 
 export type WorkspaceFeedback = {

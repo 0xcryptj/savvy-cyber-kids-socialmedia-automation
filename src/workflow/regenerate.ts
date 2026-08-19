@@ -29,9 +29,13 @@ export async function regeneratePost(id: string, reviewerGuidance?: string): Pro
   if (!previous) throw new Error("Post not found");
 
   let article = fallbackArticle(previous);
+  let usedFallbackSource = true;
   try {
     const refreshed = await findSourceArticle(previous.category as ContentCategory, previous.externalUrl || previous.sourceUrl);
-    if (refreshed) article = await hydrateArticle(refreshed);
+    if (refreshed) {
+      article = await hydrateArticle(refreshed);
+      usedFallbackSource = false;
+    }
   } catch {
     // Regeneration remains available when the source feed is temporarily down.
   }
@@ -50,6 +54,7 @@ export async function regeneratePost(id: string, reviewerGuidance?: string): Pro
     externalUrl: article.externalUrl,
     featuredImageUrl: article.featuredImageUrl,
     graphicPath: `/api/graphic/${nextId}`,
+    usedFallbackSource,
     createdAt: new Date().toISOString(),
     approvedAt: undefined,
     queuedAt: undefined,

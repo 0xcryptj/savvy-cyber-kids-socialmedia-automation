@@ -29,6 +29,7 @@ export default function ReviewPage() {
   const [graphicLoading, setGraphicLoading] = useState(true);
   const [graphicError, setGraphicError] = useState(false);
   const [feedbackNote, setFeedbackNote] = useState("");
+  const [sourceWarning, setSourceWarning] = useState<string | null>(null);
 
   useEffect(() => {
     const queryId = new URLSearchParams(window.location.search).get("id");
@@ -42,6 +43,7 @@ export default function ReviewPage() {
         const next = queryId ? payload : allPosts.find((item: WorkspacePost) => ["PENDING_REVIEW", "REVISION"].includes(item.status));
         setPost(next ?? null);
         setCopy(next ? `${next.caption}\n\n${next.hashtags.join(" ")}` : "");
+        setSourceWarning(next?.usedFallbackSource ? "Source article couldn't be refreshed — this uses the previous content." : null);
         setGraphicLoading(Boolean(next));
       }
       setLoading(false);
@@ -69,7 +71,7 @@ export default function ReviewPage() {
       const response = await fetch(`/api/posts/${post.id}/regenerate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reviewerGuidance: feedbackNote }) });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Regeneration failed");
-      setPost(payload); setCopy(`${payload.caption}\n\n${payload.hashtags.join(" ")}`); setFeedbackNote("");
+      setPost(payload); setCopy(`${payload.caption}\n\n${payload.hashtags.join(" ")}`); setFeedbackNote(""); setSourceWarning(payload.usedFallbackSource ? "Source article couldn't be refreshed — this uses the previous content." : null);
       setReviewQueue(current => [payload, ...current]);
       window.history.replaceState({}, "", `/review?id=${payload.id}`);
     } catch (err) {
@@ -83,6 +85,7 @@ export default function ReviewPage() {
   async function sharePost() {
     if (!post) return;
     const finalCopy = copy;
+    let nativeShareFailed = false;
     try {
       const response = await fetch(post.graphicPath);
       const blob = await response.blob();
@@ -94,9 +97,12 @@ export default function ReviewPage() {
         setShareMessage("Ready to post from your selected social account.");
         return;
       }
-    } catch { /* fall back to copying the package below */ }
+    } catch (err) {
+      console.warn("Native share failed; falling back to clipboard copy.", err);
+      nativeShareFailed = typeof navigator.share === "function";
+    }
     await navigator.clipboard?.writeText(`${finalCopy}\n\nGraphic: ${window.location.origin}${post.graphicPath}`);
-    setShareMessage("Caption, hashtags, and graphic link copied. Paste them into your social app.");
+    setShareMessage(nativeShareFailed ? "Native share unavailable — copied instead." : "Caption, hashtags, and graphic link copied. Paste them into your social app.");
     window.setTimeout(() => setShareMessage(null), 5000);
   }
 
@@ -117,7 +123,7 @@ export default function ReviewPage() {
     <div className="page-intro"><div><p className="eyebrow">CONTENT PIPELINE / REVIEW</p><h2>Social post preview</h2><p>Source image, Canva-style 4:5 graphic, caption, and hashtags ready for review.</p></div><span className="count">{post.category}</span></div>
     {reviewQueue.length ? <div className="card review-queue"><div className="review-queue-heading"><div><p className="eyebrow">YOUR REVIEW QUEUE</p><h3>{reviewQueue.filter(item => !["APPROVED", "REJECTED"].includes(item.status)).length} waiting for approval</h3></div><span className="mini-label">Approved and rejected posts stay logged here</span></div><div className="review-queue-list">{reviewQueue.map(item=><a key={item.id} className={`review-queue-item ${item.id === post.id ? "selected" : ""}`} href={`/review?id=${item.id}`}><span className={`queue-item-icon ${item.status === "REJECTED" ? "queue-item-rejected" : ""}`}>{item.status === "APPROVED" ? "✓" : item.status === "REJECTED" ? "×" : "•"}</span><span><strong>{item.topicHeading}</strong><small>{item.articleTitle}</small></span><span className={`status ${item.status === "APPROVED" ? "status-published" : item.status === "REJECTED" ? "status-rejected" : ""}`}>{item.status.replace("_", " ")}</span></a>)}</div></div> : null}
     <div className="review-layout">
-      <article className="card preview-card">
+      <article className="card preview-card">{sourceWarning ? <div className="warning-panel">{sourceWarning}</div> : null}
         <div className="post-main"><div className={graphicLoading ? "graphic graphic-loading" : "graphic"}>{graphicLoading ? <div className="graphic-status"><Spinner label={regenerating ? "Regenerating…" : "Rendering branded graphic…"} /></div> : null}{graphicError ? <div className="graphic-status error-panel">Graphic rendering failed. Try regenerate.</div> : null}<Image key={post.graphicPath} src={post.graphicPath} alt="Savvy Cyber Kids social post preview" width={1080} height={1350} sizes="(max-width: 900px) 100vw, 55vw" priority onLoad={() => setGraphicLoading(false)} onError={() => { setGraphicLoading(false); setGraphicError(true); }} /></div><div className="post-copy"><span className={post.status === "REJECTED" ? "status status-rejected" : "status"}>{post.status.replace("_", " ")}</span><h2>{post.topicHeading}</h2><p className="meta">{new Date(post.publishedAt).toLocaleDateString()} · <a href={post.externalUrl || post.sourceUrl} target="_blank" rel="noreferrer">Open source article ↗</a></p><h3>{post.articleTitle}</h3><label className="caption-label" htmlFor="copy">Caption + hashtags</label><textarea className="edit-area copy-editor" id="copy" value={copy} onChange={e=>setCopy(e.target.value)} /><small className="field-hint">Keep four hashtags on the final line. The two required Savvy Cyber Kids tags stay included.</small></div></div>
         <div className="actions"><label className="regeneration-guidance" htmlFor="regeneration-guidance">Regeneration guidance<textarea id="regeneration-guidance" value={feedbackNote} onChange={e=>setFeedbackNote(e.target.value)} placeholder="What should improve on the next pass?" maxLength={1000} /></label>{["PENDING_REVIEW", "REVISION"].includes(post.status) ? <><button onClick={()=>transition("APPROVED")} disabled={transitioning}>{transitioning ? <Spinner label="Saving…" /> : "Approve"}</button><button className="secondary" onClick={()=>transition("REVISION")} disabled={transitioning}>Save edit</button><button className="outline" onClick={()=>transition("REJECTED")} disabled={transitioning}>Reject</button><button className="secondary" onClick={regenerate} disabled={transitioning || regenerating}>{regenerating ? <Spinner label="Regenerating…" /> : "Regenerate"}</button></> : post.status === "REJECTED" ? <><span className="review-rejected">× Rejected and kept in the review log</span><button className="secondary" onClick={regenerate} disabled={regenerating}>{regenerating ? <Spinner label="Regenerating…" /> : "Regenerate"}</button></> : post.status === "APPROVED" ? <span className="review-complete">✓ Approved and kept in the review log</span> : <span className="review-complete">{post.status.replace("_", " ")}</span>}</div>
       </article>

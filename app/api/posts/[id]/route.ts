@@ -16,11 +16,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const originError = sameOrigin(request);
   if (originError) return originError;
   const { id } = await params;
-  const body = await request.json() as { status?: PostStatus; caption?: string; hashtags?: unknown; feedbackNote?: string };
+  const body = await request.json() as { status?: PostStatus; caption?: string; hashtags?: unknown; feedbackNote?: string; failureReason?: string };
   if (body.caption !== undefined && !boundedText(body.caption, 10000)) return NextResponse.json({ error: "Caption is too long" }, { status: 400 });
   try {
     const hashtags = body.hashtags === undefined ? undefined : validateEditableHashtags(body.hashtags);
-    const patch = { ...(body.caption !== undefined ? { caption: removeCaptionEmojis(body.caption) } : {}), ...(hashtags ? { hashtags } : {}) };
+    const patch = { ...(body.caption !== undefined ? { caption: removeCaptionEmojis(body.caption) } : {}), ...(hashtags ? { hashtags } : {}), ...(body.failureReason ? { failureReason: boundedText(body.failureReason, 1000) } : {}) };
     if (body.status) {
       return NextResponse.json(await transitionPost(id, body.status, Object.keys(patch).length ? patch : undefined, boundedText(body.feedbackNote, 1000)));
     }

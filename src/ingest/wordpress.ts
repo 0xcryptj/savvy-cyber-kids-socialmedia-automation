@@ -5,6 +5,12 @@ import { extractOpenGraph } from "./opengraph";
 import { SourceArticle } from "./types";
 import { discoverFeedItems } from "./rss";
 import { scrapeSourcePage } from "./scrape";
+import { unstable_cache } from "next/cache";
+
+export const getFeedHealth = unstable_cache(async () => {
+  const results = await Promise.allSettled([listSourceArticles("blog"), listSourceArticles("news")]);
+  return { blog: results[0].status === "fulfilled", news: results[1].status === "fulfilled" };
+}, ["feed-health"], { revalidate: 300 });
 
 type WpRendered = { rendered?: string };
 type WpPost = {

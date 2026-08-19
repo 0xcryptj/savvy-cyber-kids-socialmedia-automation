@@ -30,10 +30,12 @@ export async function transitionPost(id: string, next: PostStatus, patch?: Parti
   if (post.status === next) return savePost({ ...post, ...patch });
   assertTransition(post.status, next);
   const stamp = stamps[next];
+  const failureReason = next === "FAILED" ? patch?.failureReason || "Workflow failed before completion." : undefined;
   const updated = await savePost({
     ...post,
     ...patch,
     status: next,
+    ...(failureReason ? { failureReason } : {}),
     ...(stamp ? { [stamp]: new Date().toISOString() } : {})
   });
   if (next === "APPROVED" || next === "REJECTED") await recordFeedback({ postId: updated.id, category: updated.category, status: next, topicHeading: updated.topicHeading, articleTitle: updated.articleTitle, note: feedbackNote?.trim() || undefined, createdAt: new Date().toISOString() });

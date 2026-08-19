@@ -3,9 +3,16 @@ import { SidebarNav } from "./components/SidebarNav";
 import { AutoPipeline } from "./components/AutoPipeline";
 import { ServerLifecycle } from "./components/ServerLifecycle";
 import type { ReactNode } from "react";
+import { getFeedHealth } from "@/src/ingest/wordpress";
+import { getPipelineState } from "@/src/workspace/pipeline";
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export const revalidate = 300;
+
+export default async function RootLayout({ children }: { children: ReactNode }) {
   const today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  const [feedHealth, pipeline] = await Promise.all([getFeedHealth(), getPipelineState()]);
+  const feedsHealthy = feedHealth.blog && feedHealth.news;
+  const pipelineText = pipeline.status === "RUNNING" ? "Pipeline running…" : pipeline.lastRunAt ? `Pipeline ran ${new Date(pipeline.lastRunAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Pipeline not run yet";
   return (
     <html lang="en">
       <body>
@@ -19,9 +26,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <p className="eyebrow">SOCIAL CONTROL ROOM</p>
           <SidebarNav />
           <div className="sidebar-foot">
-            <span className="live-dot" /> Live feeds connected
-            <br />
-            <small>Human review required</small>
+            <span className={`live-dot ${feedsHealthy ? "" : "live-dot-error"}`} /> {feedsHealthy ? "Live feeds connected" : "Feed issue — check Library"}
+            <br /><small>{pipelineText}</small>
+            <br /><small>Human review required</small>
           </div>
         </aside>
         <main>
