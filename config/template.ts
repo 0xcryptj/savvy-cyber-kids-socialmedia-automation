@@ -18,6 +18,12 @@ export const canvaTemplate = {
     primary: "Asap",
     specialty: "Sketch Block Bold"
   },
+  fontWeights: {
+    regular: 400,
+    medium: 500,
+    semiBold: 600,
+    bold: 700
+  },
   layout: {
     photo: "fullBleedBackground",
     logo: "topRight",
@@ -26,6 +32,7 @@ export const canvaTemplate = {
     articleTitle: "belowLine",
     dividerColor: "#f7941d",
     highlightColor: "#00aeef",
-    fontFace: "Asap"
+    fontFace: "Asap",
+    specialtyFontFace: "Sketch Block Bold"
   }
 } as const;

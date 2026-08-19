@@ -36,11 +36,24 @@ function Logo({ src }: { src: string }) {
   );
 }
 
+function titleScale(title: string) {
+  const length = title.trim().length;
+  if (length > 125) return { fontSize: 34, lineHeight: 1.08 };
+  if (length > 95) return { fontSize: 40, lineHeight: 1.1 };
+  if (length > 68) return { fontSize: 47, lineHeight: 1.1 };
+  if (length > 45) return { fontSize: 55, lineHeight: 1.08 };
+  return { fontSize: 64, lineHeight: 1.06 };
+}
+
+function headingScale(heading: string) {
+  return Math.max(24, Math.min(36, Math.round(980 / Math.max(heading.length, 12))));
+}
+
 export async function renderTemplateGraphic(input: GraphicInput) {
   const [logoData, imageSource] = await Promise.all([loadLogo(), resolveImageSource(input.imageUrl)]);
   const { plain, highlight } = highlightedTitleParts(input.articleTitle);
   const heading = input.topicHeading.toUpperCase();
-  const photoHeight = 790;
+  const scaledTitle = titleScale(input.articleTitle);
 
   return new ImageResponse(
     (
@@ -54,38 +67,34 @@ export async function renderTemplateGraphic(input: GraphicInput) {
           fontFamily: canvaTemplate.layout.fontFace
         }}
       >
-        {imageSource ? <img src={imageSource} alt="" width={canvaTemplate.width} height={photoHeight} style={{ position: "absolute", top: 0, left: 0, right: 0, width: canvaTemplate.width, height: photoHeight, objectFit: "cover" }} /> : null}
+        {imageSource ? <img src={imageSource} alt="" width={canvaTemplate.width} height={canvaTemplate.height} style={{ position: "absolute", inset: 0, width: canvaTemplate.width, height: canvaTemplate.height, objectFit: "cover" }} /> : null}
         <div
           style={{
             position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: photoHeight,
-            backgroundImage: "linear-gradient(to bottom, rgba(0,0,0,0) 42%, rgba(0,0,0,0.18) 66%, rgba(0,0,0,0.86) 100%)"
+            inset: 0,
+            backgroundImage: "linear-gradient(to bottom, rgba(0,0,0,0) 30%, rgba(0,0,0,0.12) 51%, rgba(0,0,0,0.5) 73%, rgba(0,0,0,0.94) 100%)"
           }}
         />
-        <div style={{ position: "absolute", top: photoHeight, left: 0, right: 0, bottom: 0, background: canvaTemplate.colors.black }} />
         <Logo src={logoData} />
         <div
           style={{
             position: "absolute",
             left: 56,
             right: 56,
-            top: 835,
-            height: 455,
+            top: 855,
+            bottom: 52,
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            justifyContent: "flex-start"
+            justifyContent: "flex-end"
           }}
         >
-          <div style={{ color: "rgba(255,255,255,0.96)", fontSize: 34, fontWeight: 400, letterSpacing: 3.5, textAlign: "center", marginBottom: 20, padding: "0 20px" }}>
+          <div style={{ color: "rgba(255,255,255,0.96)", fontFamily: canvaTemplate.layout.fontFace, fontSize: headingScale(heading), fontWeight: canvaTemplate.fontWeights.bold, letterSpacing: 2.5, textAlign: "center", marginBottom: 18, padding: "0 20px" }}>
             {heading}
           </div>
-          <div style={{ width: 860, height: 3, background: canvaTemplate.layout.dividerColor, marginBottom: 28 }} />
-          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", textAlign: "center", fontSize: 46, fontWeight: 400, lineHeight: 1.14, textTransform: "uppercase", maxWidth: 900, padding: "0 18px" }}>
-            {plain ? <span style={{ color: canvaTemplate.colors.white, marginRight: 12 }}>{plain}</span> : null}
+          <div style={{ width: 860, height: 3, background: canvaTemplate.layout.dividerColor, marginBottom: 24 }} />
+          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", textAlign: "center", fontFamily: canvaTemplate.layout.fontFace, fontSize: scaledTitle.fontSize, fontWeight: canvaTemplate.fontWeights.bold, lineHeight: scaledTitle.lineHeight, textTransform: "uppercase", maxWidth: 930, padding: "0 12px" }}>
+            {plain ? <span style={{ color: canvaTemplate.colors.white, marginRight: 10 }}>{plain}</span> : null}
             <span style={{ color: canvaTemplate.colors.lightBlue }}>{highlight}</span>
           </div>
         </div>

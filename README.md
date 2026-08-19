@@ -173,7 +173,7 @@ This is intentionally file-backed local persistence. It is convenient for testin
 
 ## Template fidelity
 
-The local renderer follows the specification recorded in `config/template.ts`: 1080×1350 (4:5), Asap, the supplied Savvy Cyber Kids logo, full-bleed article imagery, the black gradient treatment, and the exact black, white, orange, light-blue, medium-blue, and dark-blue color tokens. Dynamic topic headings and article titles are fitted into that same layout. Editable social copy remains separate from the branded image composition.
+The local renderer follows the specification recorded in `config/template.ts`: 1080×1350 (4:5), Asap, the supplied Savvy Cyber Kids logo, full-bleed article imagery, a bottom-to-top black RGBA gradient, and the exact black, white, orange, light-blue, medium-blue, and dark-blue color tokens. Dynamic topic headings and article titles are automatically scaled to use the available composition. The dashboard loads static Asap Regular, Medium, SemiBold, and Bold faces; Sketch Block Bold is declared as the specialty face but is not bundled because the template identifies it as a separate premium font. Editable social copy remains separate from the branded image composition.
 
 The connected Canva file contains 24 pages. The current local layout maps to the general article treatment; the source template also includes Online Behavior, Conversation Starters, and Breaking News variants. Those variants are documented in [`docs/connectors.md`](docs/connectors.md) so they can be added as explicit renderer choices without guessing at the design. Canva asset references are retained as source metadata rather than bulk-copied into Git because some images and fonts may be private or licensed for Canva-only use.
 

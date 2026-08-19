@@ -28,7 +28,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <header>
             <div>
               <p className="eyebrow">{today.toUpperCase()}</p>
-              <h1>Good things worth sharing.</h1>
+              <h1>Savvy Cyber Kids social workspace</h1>
             </div>
             <div className="header-actions">
               <span className="safe-pill">● AUTO-PUBLISH OFF</span>
