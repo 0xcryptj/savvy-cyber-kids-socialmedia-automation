@@ -1,6 +1,5 @@
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
-import { revalidateTag, unstable_cache } from "next/cache";
 import { PostStatus } from "@/src/workflow/state";
 import { WorkspaceFeedback, WorkspacePost, WorkspaceState } from "./types";
 
@@ -14,31 +13,53 @@ async function readState(): Promise<WorkspaceState> {
   }
 }
 
-const readCachedState = unstable_cache(readState, ["workspace-state"], { revalidate: 5 });
+function postKey(post: WorkspacePost): string {
+  return `${post.status}:${post.externalUrl || post.sourceUrl}`;
+}
+
+function normalizePost(post: WorkspacePost): WorkspacePost {
+  return post.graphicPath.startsWith("/api/graphic/")
+    ? { ...post, graphicPath: post.graphicPath.split("?", 1)[0] }
+    : post;
+}
+
+export function dedupePosts(posts: WorkspacePost[]): WorkspacePost[] {
+  const seen = new Set<string>();
+  return [...posts]
+    .map(normalizePost)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .filter((post) => {
+      const key = postKey(post);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
 
 async function writeState(state: WorkspaceState): Promise<void> {
   await mkdir(path.dirname(filePath), { recursive: true });
   await writeFile(filePath, JSON.stringify(state, null, 2));
-  revalidateTag("workspace-state", "max");
 }
 
 export async function listPosts(status?: PostStatus): Promise<WorkspacePost[]> {
-  const { posts } = await readCachedState();
-  const sorted = [...posts].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  return status ? sorted.filter((post) => post.status === status) : sorted;
+  const { posts } = await readState();
+  const current = dedupePosts(posts);
+  return status ? current.filter((post) => post.status === status) : current;
 }
 
 export async function getPost(id: string): Promise<WorkspacePost | undefined> {
-  const { posts } = await readCachedState();
-  return posts.find((post) => post.id === id);
+  const { posts } = await readState();
+  const post = posts.find((item) => item.id === id);
+  return post ? normalizePost(post) : undefined;
 }
 
 export async function findPostByCanonicalUrl(url: string): Promise<WorkspacePost | undefined> {
-  const { posts } = await readCachedState();
+  const { posts } = await readState();
   return posts.find((post) => post.sourceUrl === url || post.externalUrl === url);
 }
 
 export async function savePost(post: WorkspacePost): Promise<WorkspacePost> {
+  post = normalizePost(post);
   const state = await readState();
   const index = state.posts.findIndex((item) => item.id === post.id);
   if (index >= 0) state.posts[index] = post;
@@ -48,8 +69,9 @@ export async function savePost(post: WorkspacePost): Promise<WorkspacePost> {
 }
 
 export async function countsByStatus(): Promise<Record<string, number>> {
-  const { posts } = await readCachedState();
-  return posts.reduce<Record<string, number>>((counts, post) => {
+  const { posts } = await readState();
+  const current = dedupePosts(posts);
+  return current.reduce<Record<string, number>>((counts, post) => {
     counts[post.status] = (counts[post.status] ?? 0) + 1;
     return counts;
   }, {});
