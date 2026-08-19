@@ -27,6 +27,10 @@ export const canvaTemplate = {
   layout: {
     photo: "fullBleedBackground",
     logo: "topRight",
+    logoWidth: 132,
+    logoHeight: 115,
+    logoTop: 38,
+    logoRight: 64,
     overlay: "bottomBlackGradient",
     topicHeading: "aboveLine",
     articleTitle: "belowLine",

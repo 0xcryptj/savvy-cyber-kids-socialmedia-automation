@@ -47,7 +47,7 @@ async function resolveImageSource(imageUrl?: string) {
 }
 
 function Logo({ src }: { src: string }) {
-  return <img src={src} alt="Savvy Cyber Kids" width={172} height={150} style={{ position: "absolute", top: 42, right: 76, width: 172, height: 150, objectFit: "contain" }} />;
+  return <img src={src} alt="Savvy Cyber Kids" width={canvaTemplate.layout.logoWidth} height={canvaTemplate.layout.logoHeight} style={{ position: "absolute", top: canvaTemplate.layout.logoTop, right: canvaTemplate.layout.logoRight, width: canvaTemplate.layout.logoWidth, height: canvaTemplate.layout.logoHeight, objectFit: "contain" }} />;
 }
 
 type TitleWord = { text: string; start: number; end: number };
@@ -158,11 +158,10 @@ export async function renderTemplateGraphic(input: GraphicInput) {
             left: 0,
             right: 0,
             bottom: 0,
-            height: 700,
-            backgroundImage: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.08) 18%, rgba(0,0,0,0.68) 62%, rgba(0,0,0,0.98) 100%)"
+            height: 760,
+            backgroundImage: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.12) 28%, rgba(0,0,0,0.38) 46%, rgba(0,0,0,0.78) 72%, rgba(0,0,0,0.96) 100%)"
           }}
         />
-        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: blackBoxBottom - blackBoxTop, background: "rgba(0,0,0,0.68)" }} />
         <Logo src={logoData} />
         <div
           style={{
