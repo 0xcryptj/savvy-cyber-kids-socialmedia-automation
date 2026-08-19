@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
     const post = await processArticle({ canonicalUrl, category: body.category, sourceArticle: parsedArticle?.success ? parsedArticle.data : undefined });
     return NextResponse.json(post);
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Could not create post" }, { status: 400 });
+    const message = error instanceof Error ? error.message : "Could not create post";
+    return NextResponse.json({ error: `${message} Category: ${body.category}.` }, { status: 422 });
   }
 }

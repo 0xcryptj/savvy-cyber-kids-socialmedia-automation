@@ -10,11 +10,16 @@ export async function processArticle(input: { canonicalUrl: string; category: Co
   const existing = await findPostByCanonicalUrl(input.canonicalUrl);
   if (existing) return existing;
 
-  const selected = input.sourceArticle && input.sourceArticle.category === input.category && (input.sourceArticle.canonicalUrl === input.canonicalUrl || input.sourceArticle.sourceUrl === input.canonicalUrl)
+  // The library sends the complete article the user clicked. Trust that
+  // validated payload instead of re-looking it up by URL: RSS, WordPress,
+  // redirects, and scraped canonical URLs do not always agree byte-for-byte.
+  const selected = input.sourceArticle && input.sourceArticle.category === input.category
     ? input.sourceArticle
     : undefined;
   const found = selected ? undefined : await findSourceArticle(input.category, input.canonicalUrl);
-  if (!found && !selected) throw new Error("That article is not in the live blog or news feeds.");
+  if (!found && !selected) {
+    throw new Error(`The ${input.category} source could not be matched after refresh. Refresh the ${input.category} feed and try creating the post again.`);
+  }
 
   const article = await hydrateArticle(found ?? selected!);
   const generated = finalizeGeneratedPost(await generateSocialPost(article));

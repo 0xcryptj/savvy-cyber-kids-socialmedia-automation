@@ -89,7 +89,9 @@ function titleFit(title: string, highlight: string) {
   const highlightStart = normalizedTitle.indexOf(highlight.trim().toUpperCase());
   const highlightEnd = highlightStart >= 0 ? highlightStart + highlight.trim().length : -1;
 
-  for (let fontSize = 64; fontSize >= 28; fontSize -= 2) {
+  // Start large enough to use the available black-box area for short titles,
+  // then step down only when wrapping would exceed the real dimensions.
+  for (let fontSize = 132; fontSize >= 28; fontSize -= 2) {
     const lineHeight = Math.round(fontSize * 1.06);
     const lines = wrapTitle(normalizedTitle, fontSize);
     if (lines.length * lineHeight <= titleMaxHeight) return { fontSize, lineHeight, lines, highlightStart, highlightEnd };
@@ -150,7 +152,7 @@ export async function renderTemplateGraphic(input: GraphicInput) {
             backgroundImage: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.08) 18%, rgba(0,0,0,0.68) 62%, rgba(0,0,0,0.98) 100%)"
           }}
         />
-        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 250, background: "rgba(0,0,0,0.92)" }} />
+        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 550, background: "rgba(0,0,0,0.96)" }} />
         <Logo src={logoData} />
         <div
           style={{
