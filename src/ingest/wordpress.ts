@@ -55,6 +55,7 @@ function toNewsArticle(post: WpPost): SourceArticle {
     title,
     excerpt: title,
     body: "",
+    featuredImageUrl: featuredImage(post),
     tags: ["cyber safety", "digital citizenship"],
     publishedAt: post.date
   };
@@ -96,7 +97,7 @@ export async function hydrateArticle(article: SourceArticle): Promise<SourceArti
     const description = og.description ? decodeHtml(htmlToText(og.description)) : article.excerpt;
     return {
       ...article,
-      featuredImageUrl: article.featuredImageUrl ?? og.imageUrl,
+      featuredImageUrl: article.featuredImageUrl ?? (og.imageUrl ? new URL(og.imageUrl, article.externalUrl).toString() : undefined),
       excerpt: description,
       body: description
     };

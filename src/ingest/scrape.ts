@@ -55,7 +55,7 @@ export async function scrapeSourcePage(category: ContentCategory): Promise<Sourc
       title: metadata.title ? decodeHtml(htmlToText(metadata.title)) : title,
       excerpt: firstSentences(description) || title,
       body: description,
-      featuredImageUrl: metadata.imageUrl,
+      featuredImageUrl: metadata.imageUrl ? absoluteUrl(metadata.imageUrl, url) : undefined,
       tags: [],
       publishedAt: new Date().toISOString()
     };
