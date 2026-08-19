@@ -61,7 +61,7 @@ export function LibraryClient({ blog, news }: { blog: SourceArticle[]; news: Sou
       const response = await fetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ canonicalUrl: article.canonicalUrl, category: article.category })
+        body: JSON.stringify({ canonicalUrl: article.canonicalUrl, category: article.category, sourceArticle: article })
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Could not create post");
