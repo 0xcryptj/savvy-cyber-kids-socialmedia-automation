@@ -41,6 +41,18 @@ git clone https://github.com/0xcryptj/savvy-cyber-kids-socialmedia-automation.gi
 
 Open [http://localhost:3000](http://localhost:3000).
 
+For a repeatable installer that clones the current `main` branch, installs dependencies, adds the `sck` command to your user PATH, and opens the dashboard automatically:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/0xcryptj/savvy-cyber-kids-socialmedia-automation/main/scripts/install.sh | sh
+```
+
+The installer stores the checkout under `~/.local/share/savvy-cyber-kids-socialmedia-automation` and the launcher under `~/.local/bin/sck`. Open a new terminal after installation if your shell does not reload its PATH automatically. Thereafter, run the tool from any directory with:
+
+```bash
+sck
+```
+
 Once the page opens, go to **Settings** and enter the provider, model, endpoint if needed, and API key. You do not need to edit a secrets file for the normal setup.
 
 Leave the terminal running while you use the app. Stop the development server with `Ctrl+C`.
@@ -64,6 +76,18 @@ The equivalent Command Prompt one-liner is:
 ```bat
 git clone https://github.com/0xcryptj/savvy-cyber-kids-socialmedia-automation.git && cd savvy-cyber-kids-socialmedia-automation && npm install && npm run dev
 ```
+
+### Windows one-line installer
+
+Run this in PowerShell. It installs the checkout under `%LOCALAPPDATA%`, adds `sck` to your user PATH, installs dependencies with the lockfile, and opens the dashboard:
+
+```powershell
+iwr -UseBasicParsing https://raw.githubusercontent.com/0xcryptj/savvy-cyber-kids-socialmedia-automation/main/scripts/install.ps1 | iex
+```
+
+Open a new PowerShell window if needed, then run `sck` from any directory. For security-sensitive environments, download the script first, inspect it, and execute the local file instead of piping a remote script directly.
+
+The launcher binds only to `127.0.0.1`, opens the browser when the server is ready, forwards Ctrl+C to the child process, and cleans up its server process. When the launcher started the app, closing the last dashboard tab also requests a graceful shutdown after a short navigation/reload grace period. A manually started `npm run dev` server is not automatically stopped by browser tab events.
 
 ## Configure an AI provider
 

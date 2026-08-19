@@ -1,6 +1,7 @@
 import "./globals.css";
 import { SidebarNav } from "./components/SidebarNav";
 import { AutoPipeline } from "./components/AutoPipeline";
+import { ServerLifecycle } from "./components/ServerLifecycle";
 import type { ReactNode } from "react";
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -8,6 +9,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
+        <ServerLifecycle enabled={Boolean(process.env.SCK_SHUTDOWN_TOKEN)} />
         <AutoPipeline />
         <aside>
           <div className="brand">
