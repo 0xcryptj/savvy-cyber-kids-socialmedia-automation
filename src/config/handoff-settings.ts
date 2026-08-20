@@ -8,7 +8,8 @@ const filePath = path.join(process.cwd(), "storage/handoff-settings.json");
 const emptySettings: HandoffSettings = { makeWebhookUrl: "", appPublicUrl: "" };
 
 function isLocalhost(hostname: string): boolean {
-  return /^(localhost|127\.|0\.0\.0\.0|::1)$/i.test(hostname);
+  const normalized = hostname.replace(/^\[|\]$/g, "");
+  return /^(localhost|127\.\d+\.\d+\.\d+|0\.0\.0\.0|::1)$/i.test(normalized);
 }
 
 export function normalizeHandoffUrl(value: string | undefined, kind: "webhook" | "public", fallback = ""): string {
