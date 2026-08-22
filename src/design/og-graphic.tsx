@@ -65,7 +65,7 @@ type TitleLine = { text: string; start: number; end: number };
 const titleMaxWidth = 820;
 // Keep every element inside a safe inset from the black panel. The panel starts
 // lower on the canvas so the source image remains the visual anchor.
-const blackBoxTop = 870;
+const blackBoxTop = 700;
 const blackBoxBottom = 1350;
 const blackBoxPaddingTop = 48;
 const blackBoxPaddingBottom = 64;
@@ -146,7 +146,7 @@ function graphicLayout(guidance?: string) {
     imageFit: zoomOut ? "contain" : "cover",
     imagePosition: zoomOut ? "center center" : "center 24%",
     titleWidth: saferLayout ? 780 : titleMaxWidth,
-    imageStageHeight: zoomOut ? 760 : canvaTemplate.height
+    imageStageHeight: zoomOut ? 700 : canvaTemplate.height
   } as const;
 }
 
