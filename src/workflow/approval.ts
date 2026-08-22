@@ -1,6 +1,7 @@
 import { assertTransition, PostStatus } from "./state";
 import { getPost, recordFeedback, savePost } from "@/src/workspace/store";
 import { WorkspacePost } from "@/src/workspace/types";
+import { freezePostGraphic } from "@/src/design/frozen-graphic";
 
 export function approve(status: PostStatus): PostStatus {
   assertTransition(status, "APPROVED");
@@ -32,13 +33,17 @@ export async function transitionPost(id: string, next: PostStatus, patch?: Parti
   const stamp = stamps[next];
   const failureReason = next === "FAILED" ? patch?.failureReason || "Workflow failed before completion." : undefined;
   const stampValue = stamp ? patch?.[stamp] || new Date().toISOString() : undefined;
-  const updated = await savePost({
+  let updated = {
     ...post,
     ...patch,
     status: next,
     ...(failureReason ? { failureReason } : {}),
     ...(stamp && stampValue ? { [stamp]: stampValue } : {})
-  });
+  };
+  if (next === "APPROVED") {
+    updated = { ...updated, frozenGraphicPath: await freezePostGraphic(updated) };
+  }
+  updated = await savePost(updated);
   if (next === "APPROVED" || next === "REJECTED") await recordFeedback({ postId: updated.id, category: updated.category, status: next, topicHeading: updated.topicHeading, articleTitle: updated.articleTitle, note: feedbackNote?.trim() || undefined, createdAt: new Date().toISOString() });
   return updated;
 }

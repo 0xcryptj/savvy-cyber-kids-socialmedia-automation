@@ -1,6 +1,7 @@
 import { renderTemplateGraphic } from "@/src/design/og-graphic";
 import { getPostizSettings } from "@/src/config/postiz-settings";
 import { WorkspacePost } from "@/src/workspace/types";
+import { readFrozenGraphic } from "@/src/design/frozen-graphic";
 
 export type PostizIntegration = {
   id: string;
@@ -36,9 +37,11 @@ export async function listPostizIntegrations(): Promise<PostizIntegration[]> {
 
 async function uploadGraphic(post: WorkspacePost): Promise<PostizUpload> {
   const settings = await getPostizSettings();
-  const response = await renderTemplateGraphic({ topicHeading: post.topicHeading, articleTitle: post.articleTitle, imageUrl: post.generatedImageUrl || post.featuredImageUrl, graphicGuidance: post.graphicGuidance });
+  const graphic = post.frozenGraphicPath
+    ? await readFrozenGraphic(post.frozenGraphicPath)
+    : Buffer.from(await (await renderTemplateGraphic({ topicHeading: post.topicHeading, articleTitle: post.articleTitle, imageUrl: post.generatedImageUrl || post.featuredImageUrl, graphicGuidance: post.graphicGuidance })).arrayBuffer());
   const form = new FormData();
-  form.append("file", new Blob([await response.arrayBuffer()], { type: "image/png" }), `${post.id}.png`);
+  form.append("file", new Blob([graphic], { type: "image/png" }), `${post.id}.png`);
   const uploaded = await fetch(`${settings.apiUrl}/upload`, { method: "POST", headers: { Authorization: settings.apiKey }, body: form, signal: AbortSignal.timeout(30_000) });
   const payload = await uploaded.json().catch(() => null) as PostizUpload | { message?: string } | null;
   if (!uploaded.ok || !payload || !("id" in payload) || !("path" in payload)) throw new Error(`Postiz media upload failed (${uploaded.status})`);

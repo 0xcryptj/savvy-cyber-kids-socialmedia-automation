@@ -57,6 +57,15 @@ export default function ReviewPage() {
     })();
   }, []);
 
+  useEffect(() => {
+    if (!graphicLoading || !post) return;
+    const timeout = window.setTimeout(() => {
+      setGraphicLoading(false);
+      setGraphicError(true);
+    }, 18000);
+    return () => window.clearTimeout(timeout);
+  }, [graphicLoading, post]);
+
   async function transition(status: WorkspacePost["status"]) {
     if (!post) return;
     setTransitioning(true); setError(null);

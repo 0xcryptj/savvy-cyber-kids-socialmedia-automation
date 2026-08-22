@@ -17,6 +17,7 @@ export type WorkspacePost = {
   graphicGenerationStatus?: "AI_GENERATED" | "SOURCE_ARTICLE" | "SOURCE_FALLBACK";
   graphicGuidance?: string;
   graphicPath: string;
+  frozenGraphicPath?: string;
   publishedAt: string;
   createdAt: string;
   approvedAt?: string;

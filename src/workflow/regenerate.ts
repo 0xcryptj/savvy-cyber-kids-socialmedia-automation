@@ -67,6 +67,7 @@ export async function regeneratePost(id: string, reviewerGuidance?: string): Pro
     generatedImageUrl,
     graphicGenerationStatus: generatedImageUrl ? "AI_GENERATED" : article.featuredImageUrl ? "SOURCE_ARTICLE" : "SOURCE_FALLBACK",
     graphicPath: `/api/graphic/${nextId}`,
+    frozenGraphicPath: undefined,
     graphicGuidance: [guidance, generatedRaw.graphic_guidance].filter(Boolean).join(" ").slice(0, 1000) || undefined,
     usedFallbackSource,
     createdAt: new Date().toISOString(),
