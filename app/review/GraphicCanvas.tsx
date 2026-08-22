@@ -1,98 +1,127 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { canvaTemplate } from "@/config/template";
-import { GraphicAdjustments, OverlayRegion, defaultAdjustments, maxRegions } from "@/src/design/graphic-adjustments";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { GraphicAdjustments, OverlayRegion, defaultAdjustments } from "@/src/design/graphic-adjustments";
+import { canvasHeight, canvasWidth, composition, headingBlockHeight, textBottomInset } from "@/src/design/graphic-layout";
+import { LivePreview } from "./LivePreview";
 
-type Handle = "image" | "text" | "scrim" | `region-${number}` | `resize-${number}`;
+export type Selection = "image" | "heading" | "headline" | { region: number } | null;
+
+type DragKind = "move" | "scale";
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+const sameSelection = (a: Selection, b: Selection) =>
+  typeof a === "object" && a && typeof b === "object" && b ? a.region === b.region : a === b;
 
 /**
- * Direct manipulation over the rendered graphic.
+ * Selection and dragging over the live preview.
  *
- * The server render stays the single source of truth for what the graphic looks
- * like — building a second, client-side renderer is what lets a preview and the
- * real output drift apart. So this draws only handles on top of the real PNG,
- * converts pointer movement into adjustment values, and asks for a fresh render
- * when the drag ends.
+ * Everything here is local: a drag changes React state and the browser repaints
+ * the preview immediately. The server render is only asked for when the reviewer
+ * wants to confirm the exact output, or when the layout is saved.
  */
 export function GraphicCanvas({
-  src,
+  imageUrl,
+  topicHeading,
+  articleTitle,
+  guidance,
+  sourceImageHasText,
   values,
-  selectedRegion,
-  onSelectRegion,
-  onDraft,
-  onCommit,
-  onLoad,
-  onError
+  selection,
+  onSelect,
+  onChange,
+  exactSrc,
+  showExact
 }: {
-  src: string;
+  imageUrl?: string;
+  topicHeading: string;
+  articleTitle: string;
+  guidance?: string;
+  sourceImageHasText?: boolean;
   values: GraphicAdjustments;
-  selectedRegion: number | null;
-  onSelectRegion: (index: number | null) => void;
-  /** Fires continuously during a drag; cheap, no re-render of the PNG. */
-  onDraft: (next: GraphicAdjustments) => void;
-  /** Fires once on release; triggers the server render. */
-  onCommit: (next: GraphicAdjustments) => void;
-  onLoad: () => void;
-  onError: () => void;
+  selection: Selection;
+  onSelect: (selection: Selection) => void;
+  onChange: (next: GraphicAdjustments) => void;
+  exactSrc: string;
+  showExact: boolean;
 }) {
   const frameRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ handle: Handle; startX: number; startY: number; from: GraphicAdjustments } | null>(null);
-  const [dragging, setDragging] = useState<Handle | null>(null);
+  const [scale, setScale] = useState(0.4);
+  const [imageSize, setImageSize] = useState<{ width: number; height: number }>();
+  const dragRef = useRef<{ kind: DragKind; target: Selection; startX: number; startY: number; from: GraphicAdjustments } | null>(null);
+  const [dragging, setDragging] = useState(false);
 
   const merged = { ...defaultAdjustments, ...values };
+  const layout = composition(values);
   const regions = values.regions ?? [];
 
-  /** Pointer pixels to canvas units, so a drag maps 1:1 with what is on screen. */
-  const toCanvas = useCallback((dx: number, dy: number) => {
-    const width = frameRef.current?.clientWidth || canvaTemplate.width;
-    const scale = canvaTemplate.width / width;
-    return { dx: dx * scale, dy: dy * scale };
+  // Everything inside is laid out at true canvas size and scaled down as a
+  // whole, so no measurement has to be converted twice.
+  useLayoutEffect(() => {
+    const frame = frameRef.current;
+    if (!frame) return;
+    const measure = () => setScale(frame.clientWidth / canvasWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(frame);
+    return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (!imageUrl) { setImageSize(undefined); return; }
+    let cancelled = false;
+    const image = new Image();
+    // No crossOrigin: naturalWidth/Height need no CORS, and requesting it makes
+    // the load fail outright on hosts that send no Access-Control-Allow-Origin
+    // — savvycyberkids.org among them, which is most of the library.
+    image.onload = () => { if (!cancelled) setImageSize({ width: image.naturalWidth, height: image.naturalHeight }); };
+    image.onerror = () => { if (!cancelled) setImageSize(undefined); };
+    image.src = imageUrl;
+    return () => { cancelled = true; };
+  }, [imageUrl]);
+
+  const latest = useRef(values);
+  useEffect(() => { latest.current = values; }, [values]);
 
   const move = useCallback((event: PointerEvent) => {
     const drag = dragRef.current;
     if (!drag) return;
-    const { dx, dy } = toCanvas(event.clientX - drag.startX, event.clientY - drag.startY);
+    const dx = (event.clientX - drag.startX) / scale;
+    const dy = (event.clientY - drag.startY) / scale;
     const from = { ...defaultAdjustments, ...drag.from };
     const next: GraphicAdjustments = { ...drag.from };
 
-    if (drag.handle === "image") {
-      // Dragging the photo should move the photo, so the visible window moves
-      // the opposite way: pull right, see more of the left.
-      next.focusX = clamp(from.focusX - (dx / canvaTemplate.width) * 100 * 2, 0, 100);
-      next.focusY = clamp(from.focusY - (dy / canvaTemplate.height) * 100 * 2, 0, 100);
-    } else if (drag.handle === "text") {
-      next.textTop = clamp(Math.round((from.textTop + dy) / 10) * 10, 600, 1100);
-    } else if (drag.handle === "scrim") {
-      next.scrimTop = clamp(Math.round((from.scrimTop + dy) / 10) * 10, 200, 1100);
-    } else if (drag.handle.startsWith("region-") || drag.handle.startsWith("resize-")) {
-      const index = Number(drag.handle.split("-")[1]);
+    if (drag.target === "image") {
+      if (drag.kind === "scale") {
+        next.zoom = clamp(from.zoom + dy / 600, 0, 1);
+      } else {
+        // Drag the photo, not the window onto it: pull right, see more of the left.
+        next.focusX = clamp(from.focusX - (dx / canvasWidth) * 200, 0, 100);
+        next.focusY = clamp(from.focusY - (dy / canvasHeight) * 200, 0, 100);
+      }
+    } else if (drag.target === "heading" || drag.target === "headline") {
+      if (drag.kind === "scale") {
+        const key = drag.target === "heading" ? "headingScale" : "titleScale";
+        const base = drag.target === "heading" ? from.headingScale : from.titleScale;
+        next[key] = clamp(base + dy / 400, drag.target === "heading" ? 0.6 : 0.6, drag.target === "heading" ? 1.4 : 1.2);
+      } else {
+        next.textTop = clamp(Math.round((from.textTop + dy) / 5) * 5, 600, 1100);
+      }
+    } else if (typeof drag.target === "object" && drag.target) {
+      const index = drag.target.region;
       const source = (drag.from.regions ?? [])[index];
       if (!source) return;
-      const px = (dx / canvaTemplate.width) * 100;
-      const py = (dy / canvaTemplate.height) * 100;
-      const updated: OverlayRegion = drag.handle.startsWith("resize-")
+      const px = (dx / canvasWidth) * 100;
+      const py = (dy / canvasHeight) * 100;
+      const updated: OverlayRegion = drag.kind === "scale"
         ? { ...source, width: clamp(source.width + px, 2, 100 - source.x), height: clamp(source.height + py, 2, 100 - source.y) }
         : { ...source, x: clamp(source.x + px, 0, 100 - source.width), y: clamp(source.y + py, 0, 100 - source.height) };
       next.regions = (drag.from.regions ?? []).map((region, position) => (position === index ? updated : region));
     }
-    onDraft(next);
-  }, [onDraft, toCanvas]);
+    onChange(next);
+  }, [onChange, scale]);
 
-  const end = useCallback(() => {
-    const drag = dragRef.current;
-    dragRef.current = null;
-    setDragging(null);
-    if (drag) onCommit(latestRef.current);
-  }, [onCommit]);
-
-  // move() closes over the drag start, so the newest draft has to be readable
-  // at release time without re-binding the listeners mid-drag.
-  const latestRef = useRef(values);
-  useEffect(() => { latestRef.current = values; }, [values]);
+  const end = useCallback(() => { dragRef.current = null; setDragging(false); }, []);
 
   useEffect(() => {
     if (!dragging) return;
@@ -106,61 +135,62 @@ export function GraphicCanvas({
     };
   }, [dragging, move, end]);
 
-  function start(handle: Handle, event: React.PointerEvent) {
+  function start(kind: DragKind, target: Selection, event: React.PointerEvent) {
     event.preventDefault();
     event.stopPropagation();
-    dragRef.current = { handle, startX: event.clientX, startY: event.clientY, from: values };
-    setDragging(handle);
+    onSelect(target);
+    dragRef.current = { kind, target, startX: event.clientX, startY: event.clientY, from: latest.current };
+    setDragging(true);
   }
 
-  const textTopPercent = (merged.textTop / canvaTemplate.height) * 100;
-  const scrimTopPercent = (merged.scrimTop / canvaTemplate.height) * 100;
+  function box(target: Selection, label: string, style: React.CSSProperties, hint: string) {
+    const active = sameSelection(selection, target);
+    return (
+      <div
+        className={`ec-box ${active ? "is-selected" : ""}`}
+        style={style}
+        onPointerDown={(event) => start("move", target, event)}
+        title={hint}
+      >
+        <span className="ec-label">{label}</span>
+        {active ? <span className="ec-scale" onPointerDown={(event) => start("scale", target, event)} title="Drag down to grow, up to shrink" /> : null}
+      </div>
+    );
+  }
+
+  const headingHeight = headingBlockHeight;
+  const textHeight = canvasHeight - textBottomInset - layout.textTop;
 
   return (
-    <div className={`graphic-canvas ${dragging ? "dragging" : ""}`} ref={frameRef}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt="Savvy Cyber Kids social post preview" onLoad={onLoad} onError={onError} draggable={false} />
+    <div className={`editor-canvas ${dragging ? "is-dragging" : ""}`} ref={frameRef} onPointerDown={() => onSelect(null)}>
+      <div className="editor-stage" style={{ width: canvasWidth, height: canvasHeight, transform: `scale(${scale})` }}>
+        {showExact ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="editor-exact" src={exactSrc} alt="Exact rendered output" width={canvasWidth} height={canvasHeight} />
+        ) : (
+          <LivePreview
+            imageUrl={imageUrl}
+            imageSize={imageSize}
+            topicHeading={topicHeading}
+            articleTitle={articleTitle}
+            guidance={guidance}
+            sourceImageHasText={sourceImageHasText}
+            adjustments={merged}
+          />
+        )}
 
-      <div
-        className="canvas-handle canvas-image"
-        onPointerDown={(event) => start("image", event)}
-        onClick={() => onSelectRegion(null)}
-        title="Drag to move the photo"
-      >
-        <span className="canvas-tag">Drag the photo</span>
+        {!showExact ? <>
+          {box("image", "Photo", { left: 0, top: 0, width: canvasWidth, height: layout.textTop }, "Drag to move the photo")}
+          {box("heading", "Heading", { left: 0, top: layout.textTop, width: canvasWidth, height: headingHeight }, "Drag to move, corner to resize")}
+          {box("headline", "Headline", { left: 0, top: layout.textTop + headingHeight, width: canvasWidth, height: Math.max(40, textHeight - headingHeight) }, "Drag to move, corner to resize")}
+          {regions.map((region, index) => box(
+            { region: index },
+            "Shade",
+            { left: `${region.x}%`, top: `${region.y}%`, width: `${region.width}%`, height: `${region.height}%` },
+            "Drag to move, corner to resize"
+          ))}
+        </> : null}
       </div>
-
-      <div
-        className="canvas-handle canvas-scrim"
-        style={{ top: `${scrimTopPercent}%` }}
-        onPointerDown={(event) => start("scrim", event)}
-        title="Drag to move where the fade begins"
-      >
-        <span className="canvas-tag">Fade starts</span>
-      </div>
-
-      <div
-        className="canvas-handle canvas-text"
-        style={{ top: `${textTopPercent}%` }}
-        onPointerDown={(event) => start("text", event)}
-        title="Drag to move the heading and headline"
-      >
-        <span className="canvas-tag">Drag the text</span>
-      </div>
-
-      {regions.map((region, index) => (
-        <div
-          key={`region-${index}`}
-          className={`canvas-region ${selectedRegion === index ? "selected" : ""}`}
-          style={{ left: `${region.x}%`, top: `${region.y}%`, width: `${region.width}%`, height: `${region.height}%` }}
-          onPointerDown={(event) => { onSelectRegion(index); start(`region-${index}`, event); }}
-          title="Drag to move this shaded area"
-        >
-          <span className="canvas-region-resize" onPointerDown={(event) => start(`resize-${index}`, event)} title="Drag to resize" />
-        </div>
-      ))}
-
-      {regions.length >= maxRegions ? <span className="canvas-limit">Maximum of {maxRegions} shaded areas</span> : null}
     </div>
   );
 }

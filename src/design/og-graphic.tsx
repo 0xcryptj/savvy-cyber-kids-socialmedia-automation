@@ -5,6 +5,10 @@ import { canvaTemplate } from "@/config/template";
 import { highlightedTitleParts } from "@/src/content/local-copy";
 import { GraphicIntent, parseGraphicIntent, defaultTitleWidth } from "./graphic-intent";
 import { GraphicAdjustments, defaultAdjustments } from "./graphic-adjustments";
+import {
+  brandGround, canvasHeight, composition, cropRectForZoom, dividerGap, dividerHeight, dividerWidth,
+  headingGap, headingScale, lineSegments, scrimRamps, sideInset, textBottomInset, titleFit, withOpacity
+} from "./graphic-layout";
 
 type GraphicInput = {
   topicHeading: string;
@@ -86,38 +90,6 @@ async function transcodeToPng(bytes: Buffer): Promise<UsableImage | undefined> {
   }
 }
 
-const frameRatio = canvaTemplate.width / canvaTemplate.height;
-
-/** Satori has no colour-mix, so build the rgba string directly. */
-function withOpacity(hex: string, opacity: number) {
-  const value = hex.replace("#", "");
-  const channel = (start: number) => parseInt(value.slice(start, start + 2), 16) || 0;
-  return `rgba(${channel(0)}, ${channel(2)}, ${channel(4)}, ${Math.min(1, Math.max(0, opacity))})`;
-}
-
-/**
- * The largest centred crop whose aspect ratio sits `zoom` of the way from the
- * source's own ratio toward the 4:5 frame. Satori's objectFit is all-or-nothing,
- * so a partial crop has to be baked into the pixels before rendering.
- *
- * At zoom 1 the result is exactly the frame ratio (a full-bleed crop); at zoom 0
- * the source is returned untouched.
- */
-export function cropRectForZoom(width: number, height: number, zoom: number, focusX = 50, focusY = 50) {
-  const sourceRatio = width / height;
-  const targetRatio = sourceRatio + zoom * (frameRatio - sourceRatio);
-  const cropWidth = Math.max(1, Math.min(width, sourceRatio > targetRatio ? Math.round(height * targetRatio) : width));
-  const cropHeight = Math.max(1, Math.min(height, sourceRatio > targetRatio ? height : Math.round(width / targetRatio)));
-  // The focus decides which slice survives, so dragging a wide banner sideways
-  // moves the crop rather than doing nothing.
-  return {
-    width: cropWidth,
-    height: cropHeight,
-    left: Math.max(0, Math.min(width - cropWidth, Math.round((width - cropWidth) * (focusX / 100)))),
-    top: Math.max(0, Math.min(height - cropHeight, Math.round((height - cropHeight) * (focusY / 100))))
-  };
-}
-
 async function cropTowardFrame(image: UsableImage, zoom: number, focusX: number, focusY: number): Promise<UsableImage> {
   try {
     const sharp = (await import("sharp")).default;
@@ -136,125 +108,6 @@ function Logo({ src }: { src: string }) {
   return <img src={src} alt="Savvy Cyber Kids" width={canvaTemplate.layout.logoWidth} height={canvaTemplate.layout.logoHeight} style={{ position: "absolute", top: canvaTemplate.layout.logoTop, right: canvaTemplate.layout.logoRight, width: canvaTemplate.layout.logoWidth, height: canvaTemplate.layout.logoHeight, objectFit: "contain" }} />;
 }
 
-type TitleWord = { text: string; start: number; end: number };
-type TitleLine = { text: string; start: number; end: number };
-
-// One source of truth for the lower-third composition. Every constant below is
-// derived from the canvas so the gradient, the text box, and the fitting loop
-// can never drift apart: a mismatch here is what let the overlay start 170px
-// above the text block and clip the last headline line.
-const canvasHeight = canvaTemplate.height;
-const sideInset = 56;
-// The scrim begins here fully transparent and only reaches full strength at the
-// very bottom. It must never start at a visible alpha or it reads as a box.
-const defaultScrimTop = 560;
-const defaultTextTop = 900;
-const textBottomInset = 72;
-const headingFontMax = 36;
-const headingGap = 22;
-const dividerHeight = 3;
-const dividerGap = 26;
-const headingBlockHeight = headingFontMax + headingGap + dividerHeight + dividerGap;
-const titleMaxWidth = defaultTitleWidth;
-
-/**
- * Spacing is adjustable per post, so it is derived here rather than frozen at
- * module scope. titleAreaHeight stays tied to textTop, which is what keeps the
- * fitting loop and the rendered box in agreement however far the text moves.
- */
-function composition(adjustments?: GraphicAdjustments) {
-  const scrimTop = adjustments?.scrimTop ?? defaultScrimTop;
-  const textTop = adjustments?.textTop ?? defaultTextTop;
-  return {
-    scrimTop,
-    textTop,
-    // Never let the headline box collapse to nothing, however the sliders are set.
-    titleAreaHeight: Math.max(80, canvasHeight - textBottomInset - textTop - headingBlockHeight)
-  };
-}
-
-function estimatedWidth(text: string, fontSize: number) {
-  let units = 0;
-  for (const character of text) units += character === " " ? 0.34 : /[A-Z0-9]/.test(character) ? 0.66 : 0.62;
-  return units * fontSize;
-}
-
-function titleWords(title: string): TitleWord[] {
-  return [...title.matchAll(/\S+/g)].map((match) => ({
-    text: match[0],
-    start: match.index ?? 0,
-    end: (match.index ?? 0) + match[0].length
-  }));
-}
-
-function wrapTitle(title: string, fontSize: number, maxWidth = titleMaxWidth): TitleLine[] {
-  const words = titleWords(title);
-  const lines: TitleLine[] = [];
-  let current: TitleWord[] = [];
-
-  for (const word of words) {
-    const candidate = [...current, word].map((item) => item.text).join(" ");
-    if (current.length && estimatedWidth(candidate, fontSize) > maxWidth) {
-      lines.push({ text: title.slice(current[0].start, current[current.length - 1].end), start: current[0].start, end: current[current.length - 1].end });
-      current = [word];
-    } else {
-      current.push(word);
-    }
-  }
-  if (current.length) lines.push({ text: title.slice(current[0].start, current[current.length - 1].end), start: current[0].start, end: current[current.length - 1].end });
-  return lines;
-}
-
-function titleFit(title: string, highlight: string, intent: GraphicIntent, titleAreaHeight: number, maxWidth = titleMaxWidth) {
-  // Collapse internal whitespace first: the highlight offsets and the line
-  // slices are both taken from this string, so normalising once keeps the
-  // coloured segment aligned and avoids double spaces at a segment boundary.
-  const normalizedTitle = title.trim().replace(/\s+/g, " ").toUpperCase();
-  const normalizedHighlight = highlight.trim().replace(/\s+/g, " ").toUpperCase();
-  const highlightStart = normalizedHighlight ? normalizedTitle.indexOf(normalizedHighlight) : -1;
-  const highlightEnd = highlightStart >= 0 ? highlightStart + normalizedHighlight.length : -1;
-
-  const { titleScale: requestedScale, lineSpacing } = intent;
-  for (let fontSize = Math.round(132 * requestedScale); fontSize >= 24; fontSize -= 2) {
-    const lineHeight = Math.round(fontSize * lineSpacing);
-    const lines = wrapTitle(normalizedTitle, fontSize, maxWidth);
-    // Height alone is not enough. wrapTitle cannot break a single word, so one
-    // long word ("CYBERSECURITY") stays on its own oversized line and runs off
-    // the canvas. Require every line to fit horizontally too.
-    const widthFits = lines.every((line) => estimatedWidth(line.text, fontSize) <= maxWidth);
-    if (lines.length * lineHeight <= titleAreaHeight && widthFits) return { fontSize, lineHeight, lines, highlightStart, highlightEnd };
-  }
-
-  const fontSize = 24;
-  return { fontSize, lineHeight: Math.round(fontSize * lineSpacing), lines: wrapTitle(normalizedTitle, fontSize, maxWidth), highlightStart, highlightEnd };
-}
-
-function lineSegments(line: TitleLine, highlightStart: number, highlightEnd: number) {
-  if (highlightStart < 0 || highlightEnd <= line.start || highlightStart >= line.end) return [{ text: line.text, highlighted: false }];
-  const start = Math.max(highlightStart, line.start) - line.start;
-  const end = Math.min(highlightEnd, line.end) - line.start;
-  return [
-    ...(start ? [{ text: line.text.slice(0, start), highlighted: false }] : []),
-    { text: line.text.slice(start, end), highlighted: true },
-    ...(end < line.text.length ? [{ text: line.text.slice(end), highlighted: false }] : [])
-  ];
-}
-
-function headingScale(heading: string) {
-  return Math.max(24, Math.min(headingFontMax, Math.round(980 / Math.max(heading.length, 12))));
-}
-
-// Sits behind a contained image, where the photo does not reach the edges.
-const brandGround = "linear-gradient(160deg, #0a3151 0%, #072541 52%, #04182a 100%)";
-
-// Every ramp starts fully transparent. The variants change how fast the scrim
-// deepens, never whether it begins with a hard edge.
-const scrimRamps = {
-  light: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.06) 34%, rgba(0,0,0,0.26) 54%, rgba(3,14,26,0.62) 76%, rgba(3,14,26,0.86) 100%)",
-  default: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.12) 28%, rgba(0,0,0,0.38) 46%, rgba(0,0,0,0.78) 72%, rgba(0,0,0,0.96) 100%)",
-  heavy: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(5,19,34,0.24) 26%, rgba(5,19,34,0.58) 46%, rgba(5,19,34,0.9) 72%, rgba(3,14,26,0.98) 100%)"
-} as const;
-
 export async function renderTemplateGraphic(input: GraphicInput) {
   const intent = parseGraphicIntent(input.graphicGuidance, input.sourceImageHasText, input.adjustments);
   const layout = composition(input.adjustments);
@@ -270,7 +123,12 @@ export async function renderTemplateGraphic(input: GraphicInput) {
   ]);
   const { highlight } = highlightedTitleParts(input.articleTitle);
   const heading = (input.adjustments?.topicHeading || input.topicHeading).toUpperCase();
-  const scaledTitle = titleFit(input.articleTitle, highlight, intent, layout.titleAreaHeight, intent.titleWidth);
+  const scaledTitle = titleFit(input.articleTitle, highlight, {
+    titleScale: intent.titleScale,
+    lineSpacing: intent.lineSpacing,
+    titleAreaHeight: layout.titleAreaHeight,
+    maxWidth: intent.titleWidth
+  });
 
   return new ImageResponse(
     (
@@ -332,10 +190,10 @@ export async function renderTemplateGraphic(input: GraphicInput) {
             justifyContent: "flex-start"
           }}
         >
-          <div style={{ color: "rgba(255,255,255,0.96)", fontFamily: canvaTemplate.layout.fontFace, fontSize: headingScale(heading), fontWeight: canvaTemplate.fontWeights.bold, letterSpacing: 2.5, textAlign: "center", marginBottom: headingGap, padding: "0 20px" }}>
+          <div style={{ color: "rgba(255,255,255,0.96)", fontFamily: canvaTemplate.layout.fontFace, fontSize: headingScale(heading, input.adjustments?.headingScale ?? 1), fontWeight: canvaTemplate.fontWeights.bold, letterSpacing: 2.5, textAlign: "center", marginBottom: headingGap, padding: "0 20px" }}>
             {heading}
           </div>
-          <div style={{ width: 860, height: dividerHeight, background: canvaTemplate.layout.dividerColor, marginBottom: dividerGap }} />
+          <div style={{ width: dividerWidth, height: dividerHeight, background: canvaTemplate.layout.dividerColor, marginBottom: dividerGap }} />
           <div style={{ width: "100%", height: layout.titleAreaHeight, display: "flex", flexDirection: "column", justifyContent: "flex-start", textAlign: "center", fontFamily: canvaTemplate.layout.fontFace, fontSize: scaledTitle.fontSize, fontWeight: canvaTemplate.fontWeights.bold, lineHeight: `${scaledTitle.lineHeight}px`, textTransform: "uppercase", maxWidth: intent.titleWidth, padding: "0 12px" }}>
             {scaledTitle.lines.map((line) => <div key={`${line.start}-${line.end}`} style={{ display: "flex", justifyContent: "center", width: "100%" }}>{lineSegments(line, scaledTitle.highlightStart, scaledTitle.highlightEnd).map((segment, index) => <span key={`${line.start}-${index}`} style={{ color: segment.highlighted ? canvaTemplate.colors.lightBlue : canvaTemplate.colors.white, whiteSpace: "pre-wrap" }}>{segment.text}</span>)}</div>)}
           </div>

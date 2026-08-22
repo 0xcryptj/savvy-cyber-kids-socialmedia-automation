@@ -24,6 +24,8 @@ export type GraphicAdjustments = {
   scrimTop?: number;
   /** Where the topic heading block starts, in canvas pixels from the top. */
   textTop?: number;
+  /** Multiplier on the topic heading size. */
+  headingScale?: number;
   /** Multiplier on the starting headline size. */
   titleScale?: number;
   /** Headline line-height multiplier. */
@@ -49,7 +51,7 @@ export type OverlayRegion = {
 export const maxRegions = 6;
 
 export type SliderField = {
-  key: "zoom" | "focusX" | "focusY" | "scrimTop" | "textTop" | "titleScale" | "lineSpacing";
+  key: "zoom" | "focusX" | "focusY" | "scrimTop" | "textTop" | "headingScale" | "titleScale" | "lineSpacing";
   label: string;
   hint: string;
   min: number;
@@ -66,6 +68,7 @@ export const sliderFields: SliderField[] = [
   { key: "focusY", label: "Image up / down", hint: "Which part of a tall image stays in frame", min: 0, max: 100, step: 1, displayScale: 1, unit: "%" },
   { key: "scrimTop", label: "Fade starts at", hint: "Where the dark gradient begins", min: 200, max: 1100, step: 10, displayScale: 1, unit: "px" },
   { key: "textTop", label: "Text starts at", hint: "Where the heading and headline sit", min: 600, max: 1100, step: 10, displayScale: 1, unit: "px" },
+  { key: "headingScale", label: "Heading size", hint: "Scales the small topic line above the divider", min: 0.6, max: 1.4, step: 0.01, displayScale: 100, unit: "%" },
   { key: "titleScale", label: "Headline size", hint: "Scales the headline up or down", min: 0.6, max: 1.2, step: 0.01, displayScale: 100, unit: "%" },
   { key: "lineSpacing", label: "Line spacing", hint: "Space between headline lines", min: 1, max: 1.4, step: 0.01, displayScale: 100, unit: "%" }
 ];
@@ -83,6 +86,7 @@ export const defaultAdjustments = {
   focusY: 24,
   scrimTop: 560,
   textTop: 900,
+  headingScale: 1,
   titleScale: 1,
   lineSpacing: 1.06,
   scrim: "default" as ScrimStrength

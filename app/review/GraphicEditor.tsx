@@ -1,66 +1,63 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Spinner } from "@/app/components/Spinner";
 import { GraphicAdjustments, OverlayRegion, adjustmentsToQuery, defaultAdjustments, maxRegions, scrimOptions, sliderFields } from "@/src/design/graphic-adjustments";
-import { GraphicCanvas } from "./GraphicCanvas";
+import { GraphicCanvas, Selection } from "./GraphicCanvas";
+
+const newRegion: OverlayRegion = { x: 8, y: 55, width: 84, height: 22, color: "#051322", opacity: 0.55 };
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 function formatValue(value: number, displayScale: number, unit: string) {
   return `${Math.round(value * displayScale)}${unit}`;
 }
 
-const newRegion: OverlayRegion = { x: 8, y: 55, width: 84, height: 22, color: "#051322", opacity: 0.55 };
-
 export function GraphicEditor({
   postId,
   graphicPath,
+  imageUrl,
   topicHeading,
+  articleTitle,
+  guidance,
+  sourceImageHasText,
   saved,
   onSaved
 }: {
   postId: string;
   graphicPath: string;
+  imageUrl?: string;
   topicHeading: string;
+  articleTitle: string;
+  guidance?: string;
+  sourceImageHasText?: boolean;
   saved?: GraphicAdjustments;
   onSaved: (adjustments: GraphicAdjustments | undefined) => void;
 }) {
   const [draft, setDraft] = useState<GraphicAdjustments>(saved ?? {});
-  // Committed separately from the draft: the PNG only re-renders when a drag
-  // ends, so dragging stays smooth instead of firing a render per pointer move.
-  const [committed, setCommitted] = useState<GraphicAdjustments>(saved ?? {});
+  const [selection, setSelection] = useState<Selection>(null);
+  const [showExact, setShowExact] = useState(false);
+  const [showValues, setShowValues] = useState(false);
   const [version, setVersion] = useState(0);
-  const [selectedRegion, setSelectedRegion] = useState<number | null>(null);
-  const [showSliders, setShowSliders] = useState(false);
-  const [rendering, setRendering] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const values = useMemo(() => ({ ...defaultAdjustments, ...draft }), [draft]);
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved ?? {});
   const regions = draft.regions ?? [];
+  const selectedRegion = typeof selection === "object" && selection ? selection.region : null;
 
-  const src = useMemo(() => {
-    const query = Object.keys(committed).length ? adjustmentsToQuery({ ...defaultAdjustments, ...committed }) : "";
+  // Only fetched when the reviewer asks to see the exact output, or after a save.
+  const exactSrc = useMemo(() => {
+    const query = Object.keys(draft).length ? adjustmentsToQuery({ ...defaultAdjustments, ...draft }) : "";
     return `${graphicPath}?${query}${query ? "&" : ""}v=${version}`;
-  }, [graphicPath, committed, version]);
+  }, [graphicPath, draft, version]);
 
-  const previousSrc = useRef(src);
-  useEffect(() => {
-    if (previousSrc.current !== src) { previousSrc.current = src; setRendering(true); }
-  }, [src]);
-
-  function commit(next: GraphicAdjustments) {
-    setDraft(next);
-    setCommitted(next);
-    setError(null);
-  }
-
-  function reset() {
-    setDraft({}); setCommitted({}); setSelectedRegion(null); setError(null);
+  function nudgeZoom(delta: number) {
+    setDraft({ ...draft, zoom: clamp((draft.zoom ?? defaultAdjustments.zoom) + delta, 0, 1) });
   }
 
   function updateRegion(index: number, patch: Partial<OverlayRegion>) {
-    commit({ ...draft, regions: regions.map((region, position) => (position === index ? { ...region, ...patch } : region)) });
+    setDraft({ ...draft, regions: regions.map((region, position) => (position === index ? { ...region, ...patch } : region)) });
   }
 
   async function save(clear = false) {
@@ -74,8 +71,8 @@ export function GraphicEditor({
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not save the layout");
-      const next = data.graphicAdjustments ?? {};
-      setDraft(next); setCommitted(next); setVersion((current) => current + 1);
+      setDraft(data.graphicAdjustments ?? {});
+      setVersion((current) => current + 1);
       onSaved(data.graphicAdjustments);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save the layout");
@@ -84,95 +81,100 @@ export function GraphicEditor({
     }
   }
 
-  return <div className="graphic-editor">
-    <div className="graphic-editor-heading">
+  return <section className="editor">
+    <header className="editor-head">
       <div>
         <p className="eyebrow">LAYOUT</p>
-        <h3>Drag anything on the graphic</h3>
-        <p className="field-hint">Move the photo, the text block, and where the fade begins. Nothing is kept until you save.</p>
-        {saved ? <p className="field-hint">A saved layout is active. Approving a graphic keeps its layout for the next article with a similar image.</p> : null}
+        <h3>Click anything to select it</h3>
+        <p className="editor-sub">Drag to move. Drag the corner handle to resize. {saved ? "A saved layout is active — approving keeps it for the next article with a similar image." : "Nothing is kept until you save."}</p>
       </div>
-      {rendering ? <Spinner label="Rendering…" /> : null}
-    </div>
+      <div className="editor-view-toggle" role="group" aria-label="Preview mode">
+        <button type="button" className={showExact ? "" : "is-on"} onClick={() => setShowExact(false)}>Edit</button>
+        <button type="button" className={showExact ? "is-on" : ""} onClick={() => setShowExact(true)}>Exact render</button>
+      </div>
+    </header>
 
     <GraphicCanvas
-      src={src}
+      imageUrl={imageUrl}
+      topicHeading={topicHeading}
+      articleTitle={articleTitle}
+      guidance={guidance}
+      sourceImageHasText={sourceImageHasText}
       values={values}
-      selectedRegion={selectedRegion}
-      onSelectRegion={setSelectedRegion}
-      onDraft={setDraft}
-      onCommit={commit}
-      onLoad={() => setRendering(false)}
-      onError={() => { setRendering(false); setError("The graphic could not be rendered with these settings."); }}
+      selection={selection}
+      onSelect={setSelection}
+      onChange={setDraft}
+      exactSrc={exactSrc}
+      showExact={showExact}
     />
 
-    <div className="editor-row">
-      <label className="editor-text-field">
-        Topic heading
+    <div className="editor-toolbar">
+      <div className="editor-tool">
+        <span className="editor-tool-label">Photo zoom</span>
+        <div className="editor-stepper">
+          <button type="button" onClick={() => nudgeZoom(-0.05)} aria-label="Zoom out">−</button>
+          <input type="range" min={0} max={1} step={0.01} value={values.zoom} onChange={(event) => setDraft({ ...draft, zoom: Number(event.target.value) })} aria-label="Photo zoom" />
+          <button type="button" onClick={() => nudgeZoom(0.05)} aria-label="Zoom in">+</button>
+          <strong>{Math.round(values.zoom * 100)}%</strong>
+        </div>
+      </div>
+
+      <div className="editor-tool">
+        <span className="editor-tool-label">Overlay</span>
+        <div className="editor-segmented">
+          {scrimOptions.map((option) => (
+            <button type="button" key={option} className={values.scrim === option ? "is-on" : ""} onClick={() => setDraft({ ...draft, scrim: option })}>{option}</button>
+          ))}
+        </div>
+      </div>
+    </div>
+
+    {selection === "heading" || !selection ? <div className="editor-panel">
+      <label className="editor-field">
+        <span>Heading text</span>
         <input
           type="text"
           maxLength={60}
           value={draft.topicHeading ?? topicHeading}
           onChange={(event) => setDraft({ ...draft, topicHeading: event.target.value })}
-          onBlur={(event) => commit({ ...draft, topicHeading: event.target.value.trim() || undefined })}
+          onBlur={(event) => setDraft({ ...draft, topicHeading: event.target.value.trim() || undefined })}
         />
-        <small>The article title below it is preserved exactly and cannot be edited here.</small>
       </label>
-    </div>
-
-    <div className="editor-row">
-      <span className="editor-slider-label">Shaded areas</span>
-      <div className="editor-choices">
-        <button type="button" disabled={regions.length >= maxRegions} onClick={() => { commit({ ...draft, regions: [...regions, newRegion] }); setSelectedRegion(regions.length); }}>Add shaded area</button>
-        {selectedRegion !== null && regions[selectedRegion] ? <button type="button" onClick={() => { commit({ ...draft, regions: regions.filter((_, index) => index !== selectedRegion) }); setSelectedRegion(null); }}>Remove selected</button> : null}
-      </div>
-      {selectedRegion !== null && regions[selectedRegion] ? <div className="region-controls">
-        <label>Colour<input type="color" value={regions[selectedRegion].color} onChange={(event) => updateRegion(selectedRegion, { color: event.target.value })} /></label>
-        <label>Opacity <strong>{Math.round(regions[selectedRegion].opacity * 100)}%</strong>
-          <input type="range" min={0} max={1} step={0.05} value={regions[selectedRegion].opacity} onChange={(event) => updateRegion(selectedRegion, { opacity: Number(event.target.value) })} />
-        </label>
-      </div> : <small>Add a shaded box, then drag it on the graphic. Use the corner to resize.</small>}
-    </div>
-
-    <button type="button" className="editor-disclosure" onClick={() => setShowSliders((current) => !current)}>
-      {showSliders ? "Hide precise values" : "Set precise values"}
-    </button>
-
-    {showSliders ? <div className="editor-sliders">
-      {sliderFields.map((field) => (
-        <label className="editor-slider" key={field.key}>
-          <span className="editor-slider-label">
-            {field.label}
-            <strong>{formatValue(values[field.key], field.displayScale, field.unit)}</strong>
-          </span>
-          <input
-            type="range"
-            min={field.min}
-            max={field.max}
-            step={field.step}
-            value={values[field.key]}
-            onChange={(event) => setDraft({ ...draft, [field.key]: Number(event.target.value) })}
-            onPointerUp={() => commit(draft)}
-            onKeyUp={() => commit(draft)}
-          />
-          <small>{field.hint}</small>
-        </label>
-      ))}
-      <div className="editor-slider">
-        <span className="editor-slider-label">Overlay strength</span>
-        <div className="editor-choices">
-          {scrimOptions.map((option) => (
-            <button type="button" key={option} className={values.scrim === option ? "active" : ""} onClick={() => commit({ ...draft, scrim: option })}>{option}</button>
-          ))}
-        </div>
-      </div>
+      <p className="editor-note">The headline below the divider is the article title and is preserved exactly.</p>
     </div> : null}
 
-    <div className="editor-actions">
-      <button type="button" onClick={() => save()} disabled={saving || !dirty}>{saving ? <Spinner label="Saving…" /> : "Save layout"}</button>
-      <button type="button" className="secondary" onClick={reset} disabled={saving || !Object.keys(draft).length}>Reset</button>
-      {saved ? <button type="button" className="outline" onClick={() => save(true)} disabled={saving}>Back to automatic</button> : null}
+    <div className="editor-panel">
+      <div className="editor-panel-head">
+        <span>Shaded areas</span>
+        <div className="editor-inline-actions">
+          <button type="button" disabled={regions.length >= maxRegions} onClick={() => { setDraft({ ...draft, regions: [...regions, newRegion] }); setSelection({ region: regions.length }); }}>Add</button>
+          {selectedRegion !== null && regions[selectedRegion] ? <button type="button" onClick={() => { setDraft({ ...draft, regions: regions.filter((_, index) => index !== selectedRegion) }); setSelection(null); }}>Remove</button> : null}
+        </div>
+      </div>
+      {selectedRegion !== null && regions[selectedRegion] ? <div className="editor-region-controls">
+        <label><span>Colour</span><input type="color" value={regions[selectedRegion].color} onChange={(event) => updateRegion(selectedRegion, { color: event.target.value })} /></label>
+        <label><span>Opacity <strong>{Math.round(regions[selectedRegion].opacity * 100)}%</strong></span><input type="range" min={0} max={1} step={0.05} value={regions[selectedRegion].opacity} onChange={(event) => updateRegion(selectedRegion, { opacity: Number(event.target.value) })} /></label>
+      </div> : <p className="editor-note">Add a shaded box, then drag it on the graphic. Select it to set colour and opacity.</p>}
     </div>
-    {error ? <span className="error-text">{error}</span> : null}
-  </div>;
+
+    <button type="button" className="editor-disclosure" onClick={() => setShowValues((current) => !current)}>
+      {showValues ? "Hide exact values" : "Exact values"}
+    </button>
+
+    {showValues ? <div className="editor-values">
+      {sliderFields.map((field) => (
+        <label className="editor-value" key={field.key}>
+          <span>{field.label}<strong>{formatValue(values[field.key], field.displayScale, field.unit)}</strong></span>
+          <input type="range" min={field.min} max={field.max} step={field.step} value={values[field.key]} onChange={(event) => setDraft({ ...draft, [field.key]: Number(event.target.value) })} />
+        </label>
+      ))}
+    </div> : null}
+
+    <footer className="editor-actions">
+      <button type="button" onClick={() => save()} disabled={saving || !dirty}>{saving ? <Spinner label="Saving…" /> : "Save layout"}</button>
+      <button type="button" className="secondary" onClick={() => { setDraft({}); setSelection(null); }} disabled={saving || !Object.keys(draft).length}>Reset</button>
+      {saved ? <button type="button" className="outline" onClick={() => save(true)} disabled={saving}>Back to automatic</button> : null}
+      {error ? <span className="error-text">{error}</span> : null}
+    </footer>
+  </section>;
 }

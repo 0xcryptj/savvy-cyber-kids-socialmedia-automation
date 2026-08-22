@@ -69,10 +69,29 @@ it, drag the text block, drag the line where the fade begins, and drag or resize
 shaded boxes. The topic heading is editable inline. "Set precise values" reveals
 sliders for anything that needs a number rather than a gesture.
 
-The canvas draws handles over the *real* rendered PNG rather than reproducing the
-layout in the browser. A second, client-side renderer is exactly how a preview
-and the real output drift apart, which is the failure this whole area already
-suffered once. Dragging updates handles locally and re-renders only on release.
+Editing is instant because the preview is drawn in the browser
+(`app/review/LivePreview.tsx`), not fetched. A server render costs 0.5-0.7s — it
+refetches the photo, crops it with sharp and rasterises through Satori — which is
+unusable at drag speed. It is now only paid on save, or when you switch to
+**Exact render**.
+
+Two renderers is the exact shape of the bug this area already suffered, so
+neither owns any geometry: both import `src/design/graphic-layout.ts`, which is
+isomorphic and may not touch fs, sharp, or the DOM. `imagePlacement` is the piece
+that has to agree — the server crops pixels and lets `objectFit` finish, the
+browser positions the untouched image inside an overflow-hidden frame.
+`tests/graphic-layout.test.ts` asserts the two land in the same rectangle for
+every real source shape at every focus. `npm run graphics:verify` guards the
+server side.
+
+The live preview is a preview: browser and Satori font metrics differ slightly,
+so a line break can land a word differently. Use **Exact render** to confirm
+before approving.
+
+Do not set `crossOrigin` on the image-sizing probe. `naturalWidth` needs no CORS,
+and requesting it makes the load fail outright on hosts that send no
+`Access-Control-Allow-Origin` — savvycyberkids.org among them, which is most of
+the library.
 
 The knobs, their bounds, and their UI metadata live together in
 `src/design/graphic-adjustments.ts` so the renderer, the API validation, and the

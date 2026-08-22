@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseGraphicIntent, defaultTitleWidth, saferTitleWidth, partialZoom } from "@/src/design/graphic-intent";
-import { cropRectForZoom } from "@/src/design/og-graphic";
+import { cropRectForZoom } from "@/src/design/graphic-layout";
 
 describe("parseGraphicIntent", () => {
   it("defaults to the full-bleed house style when there is no guidance", () => {
