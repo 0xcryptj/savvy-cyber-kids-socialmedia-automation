@@ -8,7 +8,7 @@ const args = process.argv.slice(2);
 const devMode = args[0] === "-dev";
 const launcherArgs = devMode ? args.slice(1) : args;
 const devRepo = process.env.SCK_DEV_HOME || join(dirname(installedRepo), `${basename(installedRepo)}-dev`);
-const repo = devMode ? devRepo : installedRepo;
+let repo = devMode ? devRepo : installedRepo;
 const configuredPort = process.env.SCK_PORT || "3000";
 const configuredPortNumber = Number(configuredPort);
 const port = Number.isInteger(configuredPortNumber) && configuredPortNumber >= 1024 && configuredPortNumber <= 65535
@@ -42,6 +42,12 @@ function addDevWorktree() {
 }
 
 async function ensureDevWorktree() {
+  // A local checkout can itself be the dev checkout (for example, when the
+  // launcher was installed from this working tree rather than from main).
+  if (!process.env.SCK_DEV_HOME && gitBranch(installedRepo) === "dev") {
+    repo = installedRepo;
+    return;
+  }
   if (existsSync(join(repo, ".git"))) {
     try {
       const branch = gitBranch(repo);
