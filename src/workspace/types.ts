@@ -1,5 +1,6 @@
 import { ContentCategory } from "@/config/feeds";
 import { PostStatus } from "@/src/workflow/state";
+import { GraphicAdjustments } from "@/src/design/graphic-adjustments";
 
 export type WorkspacePost = {
   id: string;
@@ -18,6 +19,8 @@ export type WorkspacePost = {
   graphicGuidance?: string;
   /** Source image is a designed graphic that must not be cropped. */
   sourceImageHasText?: boolean;
+  /** Manual composition overrides set in the graphic editor. */
+  graphicAdjustments?: GraphicAdjustments;
   graphicPath: string;
   frozenGraphicPath?: string;
   supersededBy?: string;

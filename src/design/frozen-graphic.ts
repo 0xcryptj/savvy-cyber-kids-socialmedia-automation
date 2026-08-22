@@ -11,7 +11,8 @@ function graphicInput(post: WorkspacePost) {
     articleTitle: post.articleTitle,
     imageUrl: post.generatedImageUrl || post.featuredImageUrl,
     graphicGuidance: post.graphicGuidance,
-    sourceImageHasText: post.sourceImageHasText
+    sourceImageHasText: post.sourceImageHasText,
+    adjustments: post.graphicAdjustments
   };
 }
 

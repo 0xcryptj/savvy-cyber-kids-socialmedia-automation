@@ -1,3 +1,5 @@
+import { GraphicAdjustments } from "./graphic-adjustments";
+
 // Reviewer feedback and model guidance both arrive here as free text. The
 // renderer used to test that text against a handful of regexes written one at a
 // time, so most natural phrasings — including the review page's own preset
@@ -63,8 +65,11 @@ export const partialZoom = 0.55;
  * @param sourceImageHasText the source is a designed graphic (banner, title
  * card, infographic) whose own words would be destroyed by a crop. Detected
  * by the vision model at generation time.
+ * @param adjustments manual overrides from the editor. A reviewer who has moved
+ * a slider has said exactly what they want, so these beat anything inferred
+ * from the guidance text.
  */
-export function parseGraphicIntent(guidance?: string, sourceImageHasText?: boolean): GraphicIntent {
+export function parseGraphicIntent(guidance?: string, sourceImageHasText?: boolean, adjustments?: GraphicAdjustments): GraphicIntent {
   const text = guidance?.trim() || "";
   const wantsFullImage = showFullImage.test(text) || Boolean(sourceImageHasText);
   const wantsCrop = zoomIn.test(text);
@@ -75,7 +80,8 @@ export function parseGraphicIntent(guidance?: string, sourceImageHasText?: boole
   // Full-bleed is the house style, so a full crop stays the default. A reviewer
   // asking to see the whole frame overrides it, an explicit crop request
   // overrides that, and a hedged request lands between the two.
-  const zoom = wantsPartial ? partialZoom : wantsCrop ? 1 : wantsFullImage ? 0 : 1;
+  const inferredZoom = wantsPartial ? partialZoom : wantsCrop ? 1 : wantsFullImage ? 0 : 1;
+  const zoom = adjustments?.zoom ?? inferredZoom;
 
   return {
     zoom,
@@ -84,10 +90,12 @@ export function parseGraphicIntent(guidance?: string, sourceImageHasText?: boole
     // bleed it off the top edge: that leaves a single transition, at the
     // bottom, where the scrim already fades the photo into the headline. Left
     // floating it gains a second hard seam along the top.
-    focus: /\bbottom\b/i.test(text) ? "center bottom" : zoom < 1 ? "center top" : "center 24%",
-    scrim: lightScrim.test(text) ? "light" : heavyScrim.test(text) ? "heavy" : "default",
-    titleScale: smallerTitle.test(text) ? 0.88 : 1,
-    lineSpacing: looserSpacing.test(text) ? 1.14 : 1.06,
+    focus: adjustments?.focusY !== undefined
+      ? `center ${adjustments.focusY}%`
+      : /\bbottom\b/i.test(text) ? "center bottom" : zoom < 1 ? "center top" : "center 24%",
+    scrim: adjustments?.scrim ?? (lightScrim.test(text) ? "light" : heavyScrim.test(text) ? "heavy" : "default"),
+    titleScale: adjustments?.titleScale ?? (smallerTitle.test(text) ? 0.88 : 1),
+    lineSpacing: adjustments?.lineSpacing ?? (looserSpacing.test(text) ? 1.14 : 1.06),
     titleWidth: saferLayout.test(text) ? saferTitleWidth : defaultTitleWidth
   };
 }

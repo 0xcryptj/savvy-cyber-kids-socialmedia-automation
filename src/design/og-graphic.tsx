@@ -4,6 +4,7 @@ import path from "path";
 import { canvaTemplate } from "@/config/template";
 import { highlightedTitleParts } from "@/src/content/local-copy";
 import { GraphicIntent, parseGraphicIntent, defaultTitleWidth } from "./graphic-intent";
+import { GraphicAdjustments } from "./graphic-adjustments";
 
 type GraphicInput = {
   topicHeading: string;
@@ -11,6 +12,7 @@ type GraphicInput = {
   imageUrl?: string;
   graphicGuidance?: string;
   sourceImageHasText?: boolean;
+  adjustments?: GraphicAdjustments;
 };
 
 async function loadLogo() {
@@ -136,18 +138,31 @@ const canvasHeight = canvaTemplate.height;
 const sideInset = 56;
 // The scrim begins here fully transparent and only reaches full strength at the
 // very bottom. It must never start at a visible alpha or it reads as a box.
-const scrimTop = 560;
-const textTop = 900;
+const defaultScrimTop = 560;
+const defaultTextTop = 900;
 const textBottomInset = 72;
 const headingFontMax = 36;
 const headingGap = 22;
 const dividerHeight = 3;
 const dividerGap = 26;
 const headingBlockHeight = headingFontMax + headingGap + dividerHeight + dividerGap;
-// The fitting loop and the rendered box share this number, so a headline that
-// "fits" is always a headline that is fully visible.
-const titleAreaHeight = canvasHeight - textBottomInset - textTop - headingBlockHeight;
 const titleMaxWidth = defaultTitleWidth;
+
+/**
+ * Spacing is adjustable per post, so it is derived here rather than frozen at
+ * module scope. titleAreaHeight stays tied to textTop, which is what keeps the
+ * fitting loop and the rendered box in agreement however far the text moves.
+ */
+function composition(adjustments?: GraphicAdjustments) {
+  const scrimTop = adjustments?.scrimTop ?? defaultScrimTop;
+  const textTop = adjustments?.textTop ?? defaultTextTop;
+  return {
+    scrimTop,
+    textTop,
+    // Never let the headline box collapse to nothing, however the sliders are set.
+    titleAreaHeight: Math.max(80, canvasHeight - textBottomInset - textTop - headingBlockHeight)
+  };
+}
 
 function estimatedWidth(text: string, fontSize: number) {
   let units = 0;
@@ -181,7 +196,7 @@ function wrapTitle(title: string, fontSize: number, maxWidth = titleMaxWidth): T
   return lines;
 }
 
-function titleFit(title: string, highlight: string, intent: GraphicIntent, maxWidth = titleMaxWidth) {
+function titleFit(title: string, highlight: string, intent: GraphicIntent, titleAreaHeight: number, maxWidth = titleMaxWidth) {
   // Collapse internal whitespace first: the highlight offsets and the line
   // slices are both taken from this string, so normalising once keeps the
   // coloured segment aligned and avoids double spaces at a segment boundary.
@@ -232,7 +247,8 @@ const scrimRamps = {
 } as const;
 
 export async function renderTemplateGraphic(input: GraphicInput) {
-  const intent = parseGraphicIntent(input.graphicGuidance, input.sourceImageHasText);
+  const intent = parseGraphicIntent(input.graphicGuidance, input.sourceImageHasText, input.adjustments);
+  const layout = composition(input.adjustments);
   const [logoData, imageSource, regularFont, mediumFont, semiBoldFont, boldFont] = await Promise.all([
     loadLogo(),
     resolveImageSource(input.imageUrl, intent.zoom),
@@ -243,7 +259,7 @@ export async function renderTemplateGraphic(input: GraphicInput) {
   ]);
   const { highlight } = highlightedTitleParts(input.articleTitle);
   const heading = input.topicHeading.toUpperCase();
-  const scaledTitle = titleFit(input.articleTitle, highlight, intent, intent.titleWidth);
+  const scaledTitle = titleFit(input.articleTitle, highlight, intent, layout.titleAreaHeight, intent.titleWidth);
 
   return new ImageResponse(
     (
@@ -273,7 +289,7 @@ export async function renderTemplateGraphic(input: GraphicInput) {
             position: "absolute",
             left: 0,
             right: 0,
-            top: scrimTop,
+            top: layout.scrimTop,
             bottom: 0,
             backgroundImage: scrimRamps[intent.scrim]
           }}
@@ -284,7 +300,7 @@ export async function renderTemplateGraphic(input: GraphicInput) {
             position: "absolute",
             left: sideInset,
             right: sideInset,
-            top: textTop,
+            top: layout.textTop,
             bottom: textBottomInset,
             display: "flex",
             flexDirection: "column",
@@ -296,7 +312,7 @@ export async function renderTemplateGraphic(input: GraphicInput) {
             {heading}
           </div>
           <div style={{ width: 860, height: dividerHeight, background: canvaTemplate.layout.dividerColor, marginBottom: dividerGap }} />
-          <div style={{ width: "100%", height: titleAreaHeight, display: "flex", flexDirection: "column", justifyContent: "flex-start", textAlign: "center", fontFamily: canvaTemplate.layout.fontFace, fontSize: scaledTitle.fontSize, fontWeight: canvaTemplate.fontWeights.bold, lineHeight: `${scaledTitle.lineHeight}px`, textTransform: "uppercase", maxWidth: intent.titleWidth, padding: "0 12px" }}>
+          <div style={{ width: "100%", height: layout.titleAreaHeight, display: "flex", flexDirection: "column", justifyContent: "flex-start", textAlign: "center", fontFamily: canvaTemplate.layout.fontFace, fontSize: scaledTitle.fontSize, fontWeight: canvaTemplate.fontWeights.bold, lineHeight: `${scaledTitle.lineHeight}px`, textTransform: "uppercase", maxWidth: intent.titleWidth, padding: "0 12px" }}>
             {scaledTitle.lines.map((line) => <div key={`${line.start}-${line.end}`} style={{ display: "flex", justifyContent: "center", width: "100%" }}>{lineSegments(line, scaledTitle.highlightStart, scaledTitle.highlightEnd).map((segment, index) => <span key={`${line.start}-${index}`} style={{ color: segment.highlighted ? canvaTemplate.colors.lightBlue : canvaTemplate.colors.white, whiteSpace: "pre-wrap" }}>{segment.text}</span>)}</div>)}
           </div>
         </div>

@@ -4,6 +4,7 @@ import { transitionPost } from "@/src/workflow/approval";
 import { getPost, savePost } from "@/src/workspace/store";
 import { boundedText, sameOrigin } from "@/src/lib/request-security";
 import { removeCaptionEmojis, validateEditableHashtags } from "@/src/content/validate";
+import { clampAdjustments } from "@/src/design/graphic-adjustments";
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -16,11 +17,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const originError = sameOrigin(request);
   if (originError) return originError;
   const { id } = await params;
-  const body = await request.json() as { status?: PostStatus; caption?: string; hashtags?: unknown; feedbackNote?: string; failureReason?: string };
+  const body = await request.json() as { status?: PostStatus; caption?: string; hashtags?: unknown; feedbackNote?: string; failureReason?: string; graphicAdjustments?: unknown };
   if (body.caption !== undefined && !boundedText(body.caption, 10000)) return NextResponse.json({ error: "Caption is too long" }, { status: 400 });
   try {
     const hashtags = body.hashtags === undefined ? undefined : validateEditableHashtags(body.hashtags);
-    const patch = { ...(body.caption !== undefined ? { caption: removeCaptionEmojis(body.caption) } : {}), ...(hashtags ? { hashtags } : {}), ...(body.failureReason ? { failureReason: boundedText(body.failureReason, 1000) } : {}) };
+    // null clears the overrides and returns the post to automatic composition.
+    const adjustmentPatch = body.graphicAdjustments === undefined
+      ? {}
+      : { graphicAdjustments: body.graphicAdjustments === null ? undefined : clampAdjustments(body.graphicAdjustments), frozenGraphicPath: undefined };
+    const patch = { ...(body.caption !== undefined ? { caption: removeCaptionEmojis(body.caption) } : {}), ...(hashtags ? { hashtags } : {}), ...(body.failureReason ? { failureReason: boundedText(body.failureReason, 1000) } : {}), ...adjustmentPatch };
     if (body.status) {
       return NextResponse.json(await transitionPost(id, body.status, Object.keys(patch).length ? patch : undefined, boundedText(body.feedbackNote, 1000)));
     }
