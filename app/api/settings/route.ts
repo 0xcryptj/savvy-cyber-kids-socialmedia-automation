@@ -10,9 +10,9 @@ export async function GET() {
   const settings = await getAISettings();
   const postiz = await getPostizSettings();
   return NextResponse.json({ ...settings, configured: await providerHasCredential(settings.provider), postiz: safePostizSettings(postiz), providers: [
-    { id: "openai", label: "OpenAI", hint: "GPT-4o and GPT-4o mini" },
-    { id: "anthropic", label: "Anthropic", hint: "Claude Sonnet and Claude Haiku" },
-    { id: "openai-compatible", label: "OpenAI-compatible", hint: "OpenRouter, Groq, Together, Ollama, or your own endpoint" }
+    { id: "openai", label: "OpenAI", hint: "Hosted OpenAI models", models: ["gpt-4o-mini", "gpt-4o"] },
+    { id: "anthropic", label: "Anthropic", hint: "Hosted Claude models", models: ["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"] },
+    { id: "openai-compatible", label: "OpenAI-compatible", hint: "OpenRouter, Groq, Together, Ollama, or your own endpoint", models: [] }
   ] });
 }
 

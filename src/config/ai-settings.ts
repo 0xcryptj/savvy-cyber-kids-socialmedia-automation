@@ -19,9 +19,10 @@ export async function getAISettings(): Promise<AISettings> {
 
 export async function saveAISettings(input: Partial<AISettings>): Promise<AISettings> {
   const current = await getAISettings();
+  const candidateModel = typeof input.model === "string" ? input.model.trim().slice(0, 120) : "";
   const next: AISettings = {
-    provider: input.provider === "anthropic" || input.provider === "openai-compatible" ? input.provider : current.provider,
-    model: typeof input.model === "string" && input.model.trim() ? input.model.trim().slice(0, 120) : current.model,
+    provider: input.provider === "openai" || input.provider === "anthropic" || input.provider === "openai-compatible" ? input.provider : current.provider,
+    model: candidateModel && /^[A-Za-z0-9._:/-]+$/.test(candidateModel) ? candidateModel : current.model,
     baseUrl: normalizeBaseUrl(input.baseUrl, current.baseUrl)
   };
   await mkdir(path.dirname(filePath), { recursive: true });
