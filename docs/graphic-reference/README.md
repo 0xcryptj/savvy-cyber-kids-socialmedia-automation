@@ -64,16 +64,44 @@ npm run graphics:record -- post_954d1aa7
 
 ## Adjusting a graphic by hand
 
-The review page has an **Adjust graphic manually** panel: image zoom and
-position, where the fade starts, where the text starts, headline size, line
-spacing, and overlay strength. Sliders preview live through the graphic route's
-query string and persist on save; "Back to automatic" clears them.
+The review page's **Layout** panel is direct manipulation: drag the photo to pan
+it, drag the text block, drag the line where the fade begins, and drag or resize
+shaded boxes. The topic heading is editable inline. "Set precise values" reveals
+sliders for anything that needs a number rather than a gesture.
 
-Manual settings beat anything inferred from the guidance text, including the
-framing chosen for a detected designed graphic. The knobs, their bounds, and
-their UI metadata live together in `src/design/graphic-adjustments.ts` so the
-renderer, the API validation, and the editor controls cannot drift apart — add
-new controls there.
+The canvas draws handles over the *real* rendered PNG rather than reproducing the
+layout in the browser. A second, client-side renderer is exactly how a preview
+and the real output drift apart, which is the failure this whole area already
+suffered once. Dragging updates handles locally and re-renders only on release.
+
+The knobs, their bounds, and their UI metadata live together in
+`src/design/graphic-adjustments.ts` so the renderer, the API validation, and the
+editor controls cannot drift apart — add new controls there. Manual settings beat
+anything inferred from the guidance text, including the framing chosen for a
+detected designed graphic.
+
+Note the image anchor carries **both** axes. A wide image cropped to the frame
+only moves horizontally, so a vertical-only anchor left half of the dragging
+inert.
+
+The article title is deliberately not editable here: preserving it exactly is a
+product rule enforced in `src/content/validate.ts`.
+
+## Remembered layouts
+
+Approving a graphic that carries manual adjustments stores that layout, keyed by
+category, source image shape, and whether the image is a designed graphic
+(`src/design/layout-memory.ts`). The next article whose image matches that key
+starts from the remembered layout instead of making you redo the work.
+
+The key is deliberately *not* crop percentage. Measuring the approved posts
+showed every Savvy Cyber Kids blog image is 800x533 and loses the same 47%, on
+graphics that were both liked and disliked — it separates nothing. Shape and
+designed-vs-photograph do separate the cases.
+
+Newest approval wins rather than averaging: averaging drags every layout toward
+a middle nobody chose. A remembered layout never carries the topic heading, which
+belongs to one article.
 
 For the occasional graphic the composer cannot get right, **Edit in Canva** in
 the media package downloads the finished PNG and opens the brand template

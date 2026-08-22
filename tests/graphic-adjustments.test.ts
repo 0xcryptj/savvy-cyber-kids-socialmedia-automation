@@ -8,8 +8,8 @@ describe("clampAdjustments", () => {
   });
 
   it("pulls out-of-range values back to the limits", () => {
-    const clamped = clampAdjustments({ zoom: 5, focusY: -20, titleScale: 99, textTop: 10 });
-    expect(clamped).toEqual({ zoom: 1, focusY: 0, titleScale: 1.2, textTop: 600 });
+    const clamped = clampAdjustments({ zoom: 5, focusX: 200, focusY: -20, titleScale: 99, textTop: 10 });
+    expect(clamped).toEqual({ zoom: 1, focusX: 100, focusY: 0, titleScale: 1.2, textTop: 600 });
   });
 
   it("drops values that are not numbers and unknown scrim names", () => {
@@ -34,7 +34,7 @@ describe("clampAdjustments", () => {
 
 describe("preview query round trip", () => {
   it("survives a trip through the query string", () => {
-    const adjustments = { zoom: 0.55, focusY: 12, scrimTop: 700, textTop: 980, titleScale: 0.9, lineSpacing: 1.2, scrim: "heavy" as const };
+    const adjustments = { zoom: 0.55, focusX: 35, focusY: 12, scrimTop: 700, textTop: 980, titleScale: 0.9, lineSpacing: 1.2, scrim: "heavy" as const, regions: [{ x: 5, y: 50, width: 90, height: 20, color: "#0a3151", opacity: 0.6 }] };
     expect(adjustmentsFromParams(new URLSearchParams(adjustmentsToQuery(adjustments)))).toEqual(adjustments);
   });
 
@@ -63,8 +63,12 @@ describe("adjustments override the guidance parser", () => {
     expect(parseGraphicIntent(undefined, true, { zoom: 1 }).zoom).toBe(1);
   });
 
-  it("sets the image anchor directly", () => {
-    expect(parseGraphicIntent(undefined, false, { focusY: 70 }).focus).toBe("center 70%");
+  it("sets the image anchor on both axes", () => {
+    // A wide image cropped to the frame only moves horizontally, so the anchor
+    // carries both axes; an unset axis stays centred.
+    expect(parseGraphicIntent(undefined, false, { focusY: 70 }).focus).toBe("50% 70%");
+    expect(parseGraphicIntent(undefined, false, { focusX: 20 }).focus).toBe("20% 50%");
+    expect(parseGraphicIntent(undefined, false, { focusX: 20, focusY: 70 }).focus).toBe("20% 70%");
   });
 
   it("leaves anything it does not set to the inferred value", () => {

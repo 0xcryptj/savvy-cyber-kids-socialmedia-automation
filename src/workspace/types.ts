@@ -1,6 +1,7 @@
 import { ContentCategory } from "@/config/feeds";
 import { PostStatus } from "@/src/workflow/state";
 import { GraphicAdjustments } from "@/src/design/graphic-adjustments";
+import { LayoutMemoryEntry } from "@/src/design/layout-memory";
 
 export type WorkspacePost = {
   id: string;
@@ -21,6 +22,8 @@ export type WorkspacePost = {
   sourceImageHasText?: boolean;
   /** Manual composition overrides set in the graphic editor. */
   graphicAdjustments?: GraphicAdjustments;
+  /** Source image width / height, used to recall a matching approved layout. */
+  sourceImageRatio?: number;
   graphicPath: string;
   frozenGraphicPath?: string;
   supersededBy?: string;
@@ -45,4 +48,4 @@ export type WorkspaceFeedback = {
   createdAt: string;
 };
 
-export type WorkspaceState = { posts: WorkspacePost[]; feedback?: WorkspaceFeedback[] };
+export type WorkspaceState = { posts: WorkspacePost[]; feedback?: WorkspaceFeedback[]; layouts?: LayoutMemoryEntry[] };

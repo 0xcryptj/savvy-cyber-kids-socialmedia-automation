@@ -1,5 +1,6 @@
 import { assertTransition, PostStatus } from "./state";
-import { getPost, recordFeedback, savePost } from "@/src/workspace/store";
+import { getPost, recordFeedback, savePost, rememberApprovedLayout } from "@/src/workspace/store";
+import { layoutKey } from "@/src/design/layout-memory";
 import { WorkspacePost } from "@/src/workspace/types";
 import { freezePostGraphic } from "@/src/design/frozen-graphic";
 
@@ -57,6 +58,11 @@ export async function transitionPost(id: string, next: PostStatus, patch?: Parti
     };
   }
   updated = await savePost(updated);
+  if (next === "APPROVED" && updated.graphicAdjustments) {
+    // Approving a hand-adjusted graphic is the signal that the layout is good.
+    const key = layoutKey(updated);
+    if (key) await rememberApprovedLayout(key, updated.graphicAdjustments);
+  }
   if (next === "APPROVED" || next === "REJECTED") await recordFeedback({ postId: updated.id, category: updated.category, status: next, topicHeading: updated.topicHeading, articleTitle: updated.articleTitle, note: feedbackNote?.trim() || undefined, createdAt: new Date().toISOString() });
   return updated;
 }

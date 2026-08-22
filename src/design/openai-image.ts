@@ -4,14 +4,33 @@ import { DesignRenderer, RenderRequest, RenderedGraphic } from "./renderer";
 
 type ImageResponsePayload = { data?: Array<{ b64_json?: string; url?: string }> };
 
-export async function articleImageAvailable(imageUrl?: string): Promise<boolean> {
-  if (!imageUrl) return false;
+export type ArticleImageInfo = { available: boolean; ratio?: number };
+
+/**
+ * Fetches the article image once and reports both whether it is usable and its
+ * aspect ratio, which is what decides how the composer should frame it and
+ * which remembered layout applies.
+ */
+export async function inspectArticleImage(imageUrl?: string): Promise<ArticleImageInfo> {
+  if (!imageUrl) return { available: false };
   try {
     const response = await fetch(imageUrl.replaceAll("&amp;", "&"), { headers: { Accept: "image/*" }, redirect: "follow", signal: AbortSignal.timeout(8000) });
-    return response.ok && (response.headers.get("content-type") || "").startsWith("image/");
+    if (!response.ok || !(response.headers.get("content-type") || "").startsWith("image/")) return { available: false };
+    try {
+      const sharp = (await import("sharp")).default;
+      const { width, height } = await sharp(Buffer.from(await response.arrayBuffer())).metadata();
+      return { available: true, ratio: width && height ? width / height : undefined };
+    } catch {
+      // Usable, just unmeasurable: no remembered layout, but still a valid image.
+      return { available: true };
+    }
   } catch {
-    return false;
+    return { available: false };
   }
+}
+
+export async function articleImageAvailable(imageUrl?: string): Promise<boolean> {
+  return (await inspectArticleImage(imageUrl)).available;
 }
 
 async function imageApiKey() {

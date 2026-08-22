@@ -2,6 +2,8 @@ import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { PostStatus } from "@/src/workflow/state";
 import { WorkspaceFeedback, WorkspacePost, WorkspaceState } from "./types";
+import { GraphicAdjustments } from "@/src/design/graphic-adjustments";
+import { LayoutMemoryEntry, recallLayout, rememberLayout } from "@/src/design/layout-memory";
 
 const filePath = path.join(process.cwd(), "storage/workspace.json");
 
@@ -92,6 +94,21 @@ export async function countsByStatus(): Promise<Record<string, number>> {
     counts[post.status] = (counts[post.status] ?? 0) + 1;
     return counts;
   }, {});
+}
+
+export async function rememberApprovedLayout(key: string, adjustments: GraphicAdjustments): Promise<void> {
+  const state = await readState();
+  await writeState({ ...state, layouts: rememberLayout(state.layouts ?? [], key, adjustments) });
+}
+
+export async function recallApprovedLayout(key?: string): Promise<GraphicAdjustments | undefined> {
+  const { layouts } = await readState();
+  return recallLayout(layouts ?? [], key);
+}
+
+export async function listRememberedLayouts(): Promise<LayoutMemoryEntry[]> {
+  const { layouts } = await readState();
+  return layouts ?? [];
 }
 
 export async function recordFeedback(feedback: WorkspaceFeedback): Promise<void> {

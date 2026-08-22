@@ -3,10 +3,11 @@ import { ContentCategory } from "@/config/feeds";
 import { generateSocialPost, finalizeGeneratedPost } from "@/src/content/generate";
 import { findSourceArticle, hydrateArticle } from "@/src/ingest/wordpress";
 import { SourceArticle } from "@/src/ingest/types";
-import { getPost, savePost } from "@/src/workspace/store";
+import { getPost, savePost, recallApprovedLayout } from "@/src/workspace/store";
 import { WorkspacePost } from "@/src/workspace/types";
 import { boundedText } from "@/src/lib/request-security";
-import { articleImageAvailable, generateOpenAIBackground } from "@/src/design/openai-image";
+import { inspectArticleImage, generateOpenAIBackground } from "@/src/design/openai-image";
+import { layoutKey } from "@/src/design/layout-memory";
 
 function fallbackArticle(post: WorkspacePost): SourceArticle {
   return {
@@ -45,7 +46,8 @@ export async function regeneratePost(id: string, reviewerGuidance?: string): Pro
   const generatedRaw = await generateSocialPost(article, guidance);
   const generated = finalizeGeneratedPost(generatedRaw);
   let generatedImageUrl: string | undefined;
-  if (!(await articleImageAvailable(article.featuredImageUrl))) {
+  const sourceImage = await inspectArticleImage(article.featuredImageUrl);
+  if (!sourceImage.available) {
     try {
       generatedImageUrl = await generateOpenAIBackground({ topicHeading: generated.topic_heading, articleTitle: generated.article_title, articleImage: article.featuredImageUrl, guidance });
     } catch (error) {
@@ -53,6 +55,10 @@ export async function regeneratePost(id: string, reviewerGuidance?: string): Pro
     }
   }
   const nextId = `post_${randomUUID().slice(0, 8)}`;
+  // A manual layout the reviewer already set on this post outlives a
+  // regeneration; otherwise fall back to what was approved for this shape.
+  const rememberedLayout = previous.graphicAdjustments
+    ?? await recallApprovedLayout(layoutKey({ category: previous.category, sourceImageRatio: sourceImage.ratio, sourceImageHasText: generatedRaw.source_image_has_text }));
   await savePost({ ...previous, status: "SUPERSEDED", supersededBy: nextId, frozenGraphicPath: undefined });
   return savePost({
     ...previous,
@@ -68,6 +74,8 @@ export async function regeneratePost(id: string, reviewerGuidance?: string): Pro
     generatedImageUrl,
     graphicGenerationStatus: generatedImageUrl ? "AI_GENERATED" : article.featuredImageUrl ? "SOURCE_ARTICLE" : "SOURCE_FALLBACK",
     sourceImageHasText: generatedRaw.source_image_has_text || undefined,
+    sourceImageRatio: sourceImage.ratio,
+    graphicAdjustments: rememberedLayout,
     graphicPath: `/api/graphic/${nextId}`,
     frozenGraphicPath: undefined,
     supersededBy: undefined,

@@ -4,7 +4,7 @@ import path from "path";
 import { canvaTemplate } from "@/config/template";
 import { highlightedTitleParts } from "@/src/content/local-copy";
 import { GraphicIntent, parseGraphicIntent, defaultTitleWidth } from "./graphic-intent";
-import { GraphicAdjustments } from "./graphic-adjustments";
+import { GraphicAdjustments, defaultAdjustments } from "./graphic-adjustments";
 
 type GraphicInput = {
   topicHeading: string;
@@ -25,7 +25,7 @@ async function loadFont(name: string) {
   return font.buffer.slice(font.byteOffset, font.byteOffset + font.byteLength);
 }
 
-async function resolveImageSource(imageUrl: string | undefined, zoom: number) {
+async function resolveImageSource(imageUrl: string | undefined, zoom: number, focusX: number, focusY: number) {
   if (!imageUrl) return undefined;
   try {
     const parsed = new URL(imageUrl.replaceAll("&amp;", "&"));
@@ -55,7 +55,7 @@ async function resolveImageSource(imageUrl: string | undefined, zoom: number) {
     // A full-frame crop is what objectFit:"cover" already does, so leave the
     // default path untouched and only reach for sharp when a partial crop is
     // actually requested.
-    const framed = zoom >= 1 ? usable : await cropTowardFrame(usable, zoom);
+    const framed = zoom >= 1 ? usable : await cropTowardFrame(usable, zoom, focusX, focusY);
     return `data:${framed.mime};base64,${framed.bytes.toString("base64")}`;
   } catch {
     return undefined;
@@ -88,6 +88,13 @@ async function transcodeToPng(bytes: Buffer): Promise<UsableImage | undefined> {
 
 const frameRatio = canvaTemplate.width / canvaTemplate.height;
 
+/** Satori has no colour-mix, so build the rgba string directly. */
+function withOpacity(hex: string, opacity: number) {
+  const value = hex.replace("#", "");
+  const channel = (start: number) => parseInt(value.slice(start, start + 2), 16) || 0;
+  return `rgba(${channel(0)}, ${channel(2)}, ${channel(4)}, ${Math.min(1, Math.max(0, opacity))})`;
+}
+
 /**
  * The largest centred crop whose aspect ratio sits `zoom` of the way from the
  * source's own ratio toward the 4:5 frame. Satori's objectFit is all-or-nothing,
@@ -96,25 +103,27 @@ const frameRatio = canvaTemplate.width / canvaTemplate.height;
  * At zoom 1 the result is exactly the frame ratio (a full-bleed crop); at zoom 0
  * the source is returned untouched.
  */
-export function cropRectForZoom(width: number, height: number, zoom: number) {
+export function cropRectForZoom(width: number, height: number, zoom: number, focusX = 50, focusY = 50) {
   const sourceRatio = width / height;
   const targetRatio = sourceRatio + zoom * (frameRatio - sourceRatio);
-  const cropWidth = sourceRatio > targetRatio ? Math.round(height * targetRatio) : width;
-  const cropHeight = sourceRatio > targetRatio ? height : Math.round(width / targetRatio);
+  const cropWidth = Math.max(1, Math.min(width, sourceRatio > targetRatio ? Math.round(height * targetRatio) : width));
+  const cropHeight = Math.max(1, Math.min(height, sourceRatio > targetRatio ? height : Math.round(width / targetRatio)));
+  // The focus decides which slice survives, so dragging a wide banner sideways
+  // moves the crop rather than doing nothing.
   return {
-    width: Math.max(1, Math.min(width, cropWidth)),
-    height: Math.max(1, Math.min(height, cropHeight)),
-    left: Math.max(0, Math.round((width - Math.min(width, cropWidth)) / 2)),
-    top: Math.max(0, Math.round((height - Math.min(height, cropHeight)) / 2))
+    width: cropWidth,
+    height: cropHeight,
+    left: Math.max(0, Math.min(width - cropWidth, Math.round((width - cropWidth) * (focusX / 100)))),
+    top: Math.max(0, Math.min(height - cropHeight, Math.round((height - cropHeight) * (focusY / 100))))
   };
 }
 
-async function cropTowardFrame(image: UsableImage, zoom: number): Promise<UsableImage> {
+async function cropTowardFrame(image: UsableImage, zoom: number, focusX: number, focusY: number): Promise<UsableImage> {
   try {
     const sharp = (await import("sharp")).default;
     const { width, height } = await sharp(image.bytes).metadata();
     if (!width || !height) return image;
-    const rect = cropRectForZoom(width, height, zoom);
+    const rect = cropRectForZoom(width, height, zoom, focusX, focusY);
     if (rect.width === width && rect.height === height) return image;
     return { bytes: await sharp(image.bytes).extract(rect).png().toBuffer(), mime: "image/png" };
   } catch {
@@ -249,16 +258,18 @@ const scrimRamps = {
 export async function renderTemplateGraphic(input: GraphicInput) {
   const intent = parseGraphicIntent(input.graphicGuidance, input.sourceImageHasText, input.adjustments);
   const layout = composition(input.adjustments);
+  const focusX = input.adjustments?.focusX ?? defaultAdjustments.focusX;
+  const focusY = input.adjustments?.focusY ?? defaultAdjustments.focusY;
   const [logoData, imageSource, regularFont, mediumFont, semiBoldFont, boldFont] = await Promise.all([
     loadLogo(),
-    resolveImageSource(input.imageUrl, intent.zoom),
+    resolveImageSource(input.imageUrl, intent.zoom, focusX, focusY),
     loadFont("Asap-Regular.ttf"),
     loadFont("Asap-Medium.ttf"),
     loadFont("Asap-SemiBold.ttf"),
     loadFont("Asap-Bold.ttf")
   ]);
   const { highlight } = highlightedTitleParts(input.articleTitle);
-  const heading = input.topicHeading.toUpperCase();
+  const heading = (input.adjustments?.topicHeading || input.topicHeading).toUpperCase();
   const scaledTitle = titleFit(input.articleTitle, highlight, intent, layout.titleAreaHeight, intent.titleWidth);
 
   return new ImageResponse(
@@ -294,6 +305,19 @@ export async function renderTemplateGraphic(input: GraphicInput) {
             backgroundImage: scrimRamps[intent.scrim]
           }}
         />
+        {(input.adjustments?.regions ?? []).map((region, index) => (
+          <div
+            key={`region-${index}`}
+            style={{
+              position: "absolute",
+              left: `${region.x}%`,
+              top: `${region.y}%`,
+              width: `${region.width}%`,
+              height: `${region.height}%`,
+              backgroundColor: withOpacity(region.color, region.opacity)
+            }}
+          />
+        ))}
         <Logo src={logoData} />
         <div
           style={{

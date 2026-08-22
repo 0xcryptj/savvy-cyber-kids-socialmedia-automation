@@ -3,9 +3,10 @@ import { ContentCategory } from "@/config/feeds";
 import { generateSocialPost, finalizeGeneratedPost } from "@/src/content/generate";
 import { findSourceArticle, hydrateArticle } from "@/src/ingest/wordpress";
 import { SourceArticle } from "@/src/ingest/types";
-import { findPostByCanonicalUrl, savePost } from "@/src/workspace/store";
+import { findPostByCanonicalUrl, savePost, recallApprovedLayout } from "@/src/workspace/store";
 import { WorkspacePost } from "@/src/workspace/types";
-import { articleImageAvailable, generateOpenAIBackground } from "@/src/design/openai-image";
+import { inspectArticleImage, generateOpenAIBackground } from "@/src/design/openai-image";
+import { layoutKey } from "@/src/design/layout-memory";
 
 export async function processArticle(input: { canonicalUrl: string; category: ContentCategory; sourceArticle?: SourceArticle }): Promise<WorkspacePost> {
   const existing = await findPostByCanonicalUrl(input.canonicalUrl);
@@ -26,7 +27,8 @@ export async function processArticle(input: { canonicalUrl: string; category: Co
   const generatedRaw = await generateSocialPost(article);
   const generated = finalizeGeneratedPost(generatedRaw);
   let generatedImageUrl: string | undefined;
-  if (!(await articleImageAvailable(article.featuredImageUrl))) {
+  const sourceImage = await inspectArticleImage(article.featuredImageUrl);
+  if (!sourceImage.available) {
     try {
       generatedImageUrl = await generateOpenAIBackground({ topicHeading: generated.topic_heading, articleTitle: generated.article_title, articleImage: article.featuredImageUrl });
     } catch (error) {
@@ -34,6 +36,9 @@ export async function processArticle(input: { canonicalUrl: string; category: Co
     }
   }
   const id = `post_${randomUUID().slice(0, 8)}`;
+  // Start from the layout that was adjusted and approved for this shape of
+  // image last time, rather than making the reviewer redo the same work.
+  const rememberedLayout = await recallApprovedLayout(layoutKey({ category: article.category, sourceImageRatio: sourceImage.ratio, sourceImageHasText: generatedRaw.source_image_has_text }));
 
   return savePost({
     id,
@@ -50,6 +55,8 @@ export async function processArticle(input: { canonicalUrl: string; category: Co
     generatedImageUrl,
     graphicGenerationStatus: generatedImageUrl ? "AI_GENERATED" : article.featuredImageUrl ? "SOURCE_ARTICLE" : "SOURCE_FALLBACK",
     sourceImageHasText: generatedRaw.source_image_has_text || undefined,
+    sourceImageRatio: sourceImage.ratio,
+    graphicAdjustments: rememberedLayout,
     graphicPath: `/api/graphic/${id}`,
     publishedAt: article.publishedAt,
     createdAt: new Date().toISOString()

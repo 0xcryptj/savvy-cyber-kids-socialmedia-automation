@@ -90,8 +90,10 @@ export function parseGraphicIntent(guidance?: string, sourceImageHasText?: boole
     // bleed it off the top edge: that leaves a single transition, at the
     // bottom, where the scrim already fades the photo into the headline. Left
     // floating it gains a second hard seam along the top.
-    focus: adjustments?.focusY !== undefined
-      ? `center ${adjustments.focusY}%`
+    // Both axes: a wide image cropped to the frame only moves horizontally, so a
+    // vertical-only anchor left half the dragging inert.
+    focus: adjustments?.focusX !== undefined || adjustments?.focusY !== undefined
+      ? `${adjustments.focusX ?? 50}% ${adjustments.focusY ?? 50}%`
       : /\bbottom\b/i.test(text) ? "center bottom" : zoom < 1 ? "center top" : "center 24%",
     scrim: adjustments?.scrim ?? (lightScrim.test(text) ? "light" : heavyScrim.test(text) ? "heavy" : "default"),
     titleScale: adjustments?.titleScale ?? (smallerTitle.test(text) ? 0.88 : 1),
