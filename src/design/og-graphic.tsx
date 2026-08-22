@@ -70,6 +70,7 @@ const blackBoxBottom = 1350;
 const blackBoxPaddingTop = 48;
 const blackBoxPaddingBottom = 64;
 const titleMaxHeight = blackBoxBottom - blackBoxTop - blackBoxPaddingTop - blackBoxPaddingBottom - 100;
+const titleAreaHeight = 430;
 
 function estimatedWidth(text: string, fontSize: number) {
   let units = 0;
@@ -146,7 +147,7 @@ function graphicLayout(guidance?: string) {
     imageFit: zoomOut ? "contain" : "cover",
     imagePosition: zoomOut ? "center center" : "center 24%",
     titleWidth: saferLayout ? 780 : titleMaxWidth,
-    imageStageHeight: zoomOut ? 700 : canvaTemplate.height
+    imageStageHeight: zoomOut ? 760 : canvaTemplate.height
   } as const;
 }
 
@@ -176,7 +177,11 @@ export async function renderTemplateGraphic(input: GraphicInput) {
           fontFamily: canvaTemplate.layout.fontFace
         }}
       >
-        {imageSource ? <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: layout.imageStageHeight, display: "flex", alignItems: "center", justifyContent: "center", background: canvaTemplate.colors.darkBlue, overflow: "hidden" }}><img src={imageSource} alt="" width={canvaTemplate.width} height={canvaTemplate.height} style={{ width: canvaTemplate.width, height: layout.imageStageHeight, objectFit: layout.imageFit, objectPosition: layout.imagePosition }} /></div> : <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: canvaTemplate.colors.darkBlue, color: "rgba(255,255,255,0.82)", fontFamily: canvaTemplate.layout.fontFace, fontSize: 28, letterSpacing: 3 }}>IMAGE UNAVAILABLE</div>}
+        {imageSource ? <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: layout.imageStageHeight, display: "flex", alignItems: "center", justifyContent: "center", background: canvaTemplate.colors.darkBlue, overflow: "hidden" }}>
+          {layout.imageFit === "contain" ? <img src={imageSource} alt="" width={canvaTemplate.width} height={layout.imageStageHeight} style={{ position: "absolute", inset: -28, width: canvaTemplate.width + 56, height: layout.imageStageHeight + 56, objectFit: "cover", objectPosition: layout.imagePosition, opacity: 0.42 }} /> : null}
+          <img src={imageSource} alt="" width={canvaTemplate.width} height={layout.imageStageHeight} style={{ position: "relative", width: canvaTemplate.width, height: layout.imageStageHeight, objectFit: layout.imageFit, objectPosition: layout.imagePosition }} />
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,27,45,0.04) 0%, rgba(0,27,45,0.08) 58%, rgba(0,0,0,0.62) 100%)" }} />
+        </div> : <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: canvaTemplate.colors.darkBlue, color: "rgba(255,255,255,0.82)", fontFamily: canvaTemplate.layout.fontFace, fontSize: 28, letterSpacing: 3 }}>IMAGE UNAVAILABLE</div>}
         <div
           style={{
             position: "absolute",
@@ -205,7 +210,7 @@ export async function renderTemplateGraphic(input: GraphicInput) {
             {heading}
           </div>
           <div style={{ width: 860, height: 3, background: canvaTemplate.layout.dividerColor, marginBottom: 28 }} />
-          <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-start", textAlign: "center", fontFamily: canvaTemplate.layout.fontFace, fontSize: scaledTitle.fontSize, fontWeight: canvaTemplate.fontWeights.bold, lineHeight: `${scaledTitle.lineHeight}px`, textTransform: "uppercase", maxWidth: layout.titleWidth, padding: "0 12px", overflow: "hidden" }}>
+          <div style={{ width: "100%", height: titleAreaHeight, display: "flex", flexDirection: "column", justifyContent: "center", textAlign: "center", fontFamily: canvaTemplate.layout.fontFace, fontSize: scaledTitle.fontSize, fontWeight: canvaTemplate.fontWeights.bold, lineHeight: `${scaledTitle.lineHeight}px`, textTransform: "uppercase", maxWidth: layout.titleWidth, padding: "0 12px", overflow: "hidden" }}>
             {scaledTitle.lines.map((line) => <div key={`${line.start}-${line.end}`} style={{ display: "flex", justifyContent: "center", whiteSpace: "nowrap", overflow: "hidden", width: "100%" }}>{lineSegments(line, scaledTitle.highlightStart, scaledTitle.highlightEnd).map((segment, index) => <span key={`${line.start}-${index}`} style={{ color: segment.highlighted ? canvaTemplate.colors.lightBlue : canvaTemplate.colors.white, whiteSpace: "pre" }}>{segment.text}</span>)}</div>)}
           </div>
         </div>
