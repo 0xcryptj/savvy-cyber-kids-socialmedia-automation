@@ -143,7 +143,7 @@ function graphicLayout(guidance?: string) {
   const text = guidance?.toLowerCase() || "";
   const saferLayout = /safer_layout|safe layout|avoid overlap|no overlap|fix cut|prevent cut|question[\s-]?mark|punctuation/.test(text);
   return {
-    imageFit: "cover" as const,
+    imageFit: /crop|fill|zoom in|close[- ]?up/.test(text) && !/contain|keep visible|no crop|full image|text|banner/.test(text) ? "cover" as const : "contain" as const,
     imagePosition: /top|banner|logo/.test(text) ? "center top" : "center center",
     titleWidth: saferLayout ? 780 : titleMaxWidth,
     imageStageHeight: canvaTemplate.height
@@ -176,7 +176,7 @@ export async function renderTemplateGraphic(input: GraphicInput) {
           fontFamily: canvaTemplate.layout.fontFace
         }}
       >
-        {imageSource ? <img src={imageSource} alt="" width={canvaTemplate.width} height={canvaTemplate.height} style={{ position: "absolute", inset: 0, width: canvaTemplate.width, height: canvaTemplate.height, objectFit: layout.imageFit, objectPosition: layout.imagePosition }} /> : <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: canvaTemplate.colors.darkBlue, color: "rgba(255,255,255,0.82)", fontFamily: canvaTemplate.layout.fontFace, fontSize: 28, letterSpacing: 3 }}>IMAGE UNAVAILABLE</div>}
+        {imageSource ? <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(145deg, #0b3558 0%, #123f63 52%, #061c31 100%)" }}><img src={imageSource} alt="" width={canvaTemplate.width} height={canvaTemplate.height} style={{ position: "relative", width: canvaTemplate.width, height: canvaTemplate.height, objectFit: layout.imageFit, objectPosition: layout.imagePosition }} /></div> : <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: canvaTemplate.colors.darkBlue, color: "rgba(255,255,255,0.82)", fontFamily: canvaTemplate.layout.fontFace, fontSize: 28, letterSpacing: 3 }}>IMAGE UNAVAILABLE</div>}
         <div
           style={{
             position: "absolute",
@@ -184,7 +184,7 @@ export async function renderTemplateGraphic(input: GraphicInput) {
             right: 0,
             bottom: 0,
             height: 820,
-            backgroundImage: "linear-gradient(to bottom, rgba(16,44,74,0) 0%, rgba(16,44,74,0.04) 28%, rgba(8,29,49,0.34) 48%, rgba(5,19,34,0.88) 72%, rgba(0,10,20,0.98) 100%)"
+            backgroundImage: "linear-gradient(to bottom, rgba(5,19,34,0.78) 0%, rgba(5,19,34,0.9) 18%, rgba(5,19,34,0.96) 52%, rgba(0,10,20,0.99) 100%)"
           }}
         />
         <Logo src={logoData} />

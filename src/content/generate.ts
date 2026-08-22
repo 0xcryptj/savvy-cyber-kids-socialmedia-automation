@@ -10,7 +10,7 @@ export function finalizeGeneratedPost(input: GeneratedSocialPost) {
   return buildFinalPost(input);
 }
 
-const systemPrompt = `Create a warm, practical Savvy Cyber Kids social post for families. Preserve the article title exactly. Use plain text only: do not use emojis or decorative symbols. Return exactly two topical hashtags; do not include #savvycyberkids or #cyberhero. When an article image is attached, inspect it before deciding graphic_guidance: identify the subject's focal area, whether the image is portrait or landscape, and where the composer can safely place copy. Never ask the image model to replace an available article image. Use short actionable guidance such as "center subject, keep top banner visible, place text over the darker lower area" or "crop to the upper subject and use a navy gradient behind the title". Respond with JSON only matching this shape: {"topic_heading":"string","article_title":"string","caption":"string","hashtags":["#tag1","#tag2"],"graphic_guidance":"optional visual instruction"}.`;
+const systemPrompt = `Create a warm, practical Savvy Cyber Kids social post for families. Preserve the article title exactly. Use plain text only: do not use emojis or decorative symbols. Return exactly two topical hashtags; do not include #savvycyberkids or #cyberhero. When an article image is attached, inspect it before deciding graphic_guidance: identify the subject's focal area, whether the image is portrait or landscape, whether it already contains words, banners, or logos, and where the composer can safely place copy. If the image already contains any text, banner, logo, or designed graphic, ALWAYS return guidance containing "contain_image" and "keep all source text visible". Never recommend cropping a text-bearing image. Never ask the image model to replace an available article image. Use short actionable guidance such as "contain_image; keep all source text visible; place the new title over an opaque navy panel" or "center the subject and use a navy gradient behind the title". Respond with JSON only matching this shape: {"topic_heading":"string","article_title":"string","caption":"string","hashtags":["#tag1","#tag2"],"graphic_guidance":"optional visual instruction"}.`;
 
 async function apiKey(provider: "openai" | "anthropic" | "openai-compatible") {
   const stored = await getStoredCredential(provider);
@@ -49,7 +49,8 @@ async function generateWithProvider(article: SourceArticle, reviewerGuidance?: s
 export async function generateSocialPost(article: SourceArticle, reviewerGuidance?: string): Promise<GeneratedSocialPost> {
   try {
     return await generateWithProvider(article, reviewerGuidance);
-  } catch {
+  } catch (error) {
+    console.warn("AI content/vision request failed; using local fallback:", error instanceof Error ? error.message : "unknown error");
     return createLocalPost(article);
   }
 }
