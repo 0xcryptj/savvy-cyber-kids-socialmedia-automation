@@ -14,6 +14,7 @@ export type WorkspacePost = {
   externalUrl?: string;
   featuredImageUrl?: string;
   generatedImageUrl?: string;
+  graphicGenerationStatus?: "AI_GENERATED" | "SOURCE_FALLBACK";
   graphicGuidance?: string;
   graphicPath: string;
   publishedAt: string;

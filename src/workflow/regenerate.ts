@@ -6,6 +6,7 @@ import { SourceArticle } from "@/src/ingest/types";
 import { getPost, savePost } from "@/src/workspace/store";
 import { WorkspacePost } from "@/src/workspace/types";
 import { boundedText } from "@/src/lib/request-security";
+import { generateOpenAIBackground } from "@/src/design/openai-image";
 
 function fallbackArticle(post: WorkspacePost): SourceArticle {
   return {
@@ -43,6 +44,12 @@ export async function regeneratePost(id: string, reviewerGuidance?: string): Pro
   const guidance = boundedText(reviewerGuidance, 1000);
   const generatedRaw = await generateSocialPost(article, guidance);
   const generated = finalizeGeneratedPost(generatedRaw);
+  let generatedImageUrl: string | undefined;
+  try {
+    generatedImageUrl = await generateOpenAIBackground({ topicHeading: generated.topic_heading, articleTitle: generated.article_title, articleImage: article.featuredImageUrl, guidance });
+  } catch (error) {
+    console.warn("OpenAI graphic regeneration unavailable; using source image:", error instanceof Error ? error.message : "unknown error");
+  }
   const nextId = `post_${randomUUID().slice(0, 8)}`;
   return savePost({
     ...previous,
@@ -55,6 +62,8 @@ export async function regeneratePost(id: string, reviewerGuidance?: string): Pro
     sourceUrl: article.sourceUrl,
     externalUrl: article.externalUrl,
     featuredImageUrl: article.featuredImageUrl,
+    generatedImageUrl,
+    graphicGenerationStatus: generatedImageUrl ? "AI_GENERATED" : "SOURCE_FALLBACK",
     graphicPath: `/api/graphic/${nextId}`,
     graphicGuidance: [guidance, generatedRaw.graphic_guidance].filter(Boolean).join(" ").slice(0, 1000) || undefined,
     usedFallbackSource,

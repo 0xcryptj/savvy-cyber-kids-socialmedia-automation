@@ -50,7 +50,7 @@ export default function ReviewPage() {
         const next = queryId ? payload : allPosts.find((item: WorkspacePost) => ["PENDING_REVIEW", "REVISION"].includes(item.status));
         setPost(next ?? null);
         setCopy(next ? `${next.caption}\n\n${next.hashtags.join(" ")}` : "");
-        setSourceWarning(next?.usedFallbackSource ? "Source article couldn't be refreshed — this uses the previous content." : null);
+        setSourceWarning(next?.graphicGenerationStatus === "SOURCE_FALLBACK" ? "AI graphic generation was unavailable — this preview is using the source image. Check the server log and OpenAI image settings." : next?.usedFallbackSource ? "Source article couldn't be refreshed — this uses the previous content." : null);
         setGraphicLoading(Boolean(next));
       }
       setLoading(false);
@@ -78,7 +78,7 @@ export default function ReviewPage() {
       const response = await fetch(`/api/posts/${post.id}/regenerate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reviewerGuidance: feedbackNote }) });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Regeneration failed");
-      setPost(payload); setCopy(`${payload.caption}\n\n${payload.hashtags.join(" ")}`); setFeedbackNote(""); setSourceWarning(payload.usedFallbackSource ? "Source article couldn't be refreshed — this uses the previous content." : null);
+      setPost(payload); setCopy(`${payload.caption}\n\n${payload.hashtags.join(" ")}`); setFeedbackNote(""); setSourceWarning(payload.graphicGenerationStatus === "SOURCE_FALLBACK" ? "AI graphic generation was unavailable — this preview is using the source image. Check the server log and OpenAI image settings." : payload.usedFallbackSource ? "Source article couldn't be refreshed — this uses the previous content." : null);
       setReviewQueue(current => [payload, ...current]);
       window.history.replaceState({}, "", `/review?id=${payload.id}`);
     } catch (err) {

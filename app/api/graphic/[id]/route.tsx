@@ -10,11 +10,11 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
     return await renderTemplateGraphic({
       topicHeading: post.topicHeading,
       articleTitle: post.articleTitle,
-      imageUrl: post.featuredImageUrl,
+      imageUrl: post.generatedImageUrl || post.featuredImageUrl,
       graphicGuidance: post.graphicGuidance
     });
   } catch {
     // A bad third-party image must not take down the whole graphic route.
-    return renderTemplateGraphic({ topicHeading: post.topicHeading, articleTitle: post.articleTitle, graphicGuidance: post.graphicGuidance });
+    return renderTemplateGraphic({ topicHeading: post.topicHeading, articleTitle: post.articleTitle, imageUrl: post.featuredImageUrl, graphicGuidance: post.graphicGuidance });
   }
 }

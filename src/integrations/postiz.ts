@@ -36,7 +36,7 @@ export async function listPostizIntegrations(): Promise<PostizIntegration[]> {
 
 async function uploadGraphic(post: WorkspacePost): Promise<PostizUpload> {
   const settings = await getPostizSettings();
-  const response = await renderTemplateGraphic({ topicHeading: post.topicHeading, articleTitle: post.articleTitle, imageUrl: post.featuredImageUrl, graphicGuidance: post.graphicGuidance });
+  const response = await renderTemplateGraphic({ topicHeading: post.topicHeading, articleTitle: post.articleTitle, imageUrl: post.generatedImageUrl || post.featuredImageUrl, graphicGuidance: post.graphicGuidance });
   const form = new FormData();
   form.append("file", new Blob([await response.arrayBuffer()], { type: "image/png" }), `${post.id}.png`);
   const uploaded = await fetch(`${settings.apiUrl}/upload`, { method: "POST", headers: { Authorization: settings.apiKey }, body: form, signal: AbortSignal.timeout(30_000) });
