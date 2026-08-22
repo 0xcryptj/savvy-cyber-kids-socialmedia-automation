@@ -141,11 +141,12 @@ function headingScale(heading: string) {
 function graphicLayout(guidance?: string) {
   const text = guidance?.toLowerCase() || "";
   const zoomOut = /zoom[\s-]*out|show more|less crop|less cropped|full image|contain_image/.test(text);
-  const saferLayout = /safer_layout|safe layout|avoid overlap|no overlap|fix cut|prevent cut|question mark|punctuation/.test(text);
+  const saferLayout = /safer_layout|safe layout|avoid overlap|no overlap|fix cut|prevent cut|question[\s-]?mark|punctuation/.test(text);
   return {
     imageFit: zoomOut ? "contain" : "cover",
     imagePosition: zoomOut ? "center center" : "center 24%",
-    titleWidth: saferLayout ? 780 : titleMaxWidth
+    titleWidth: saferLayout ? 780 : titleMaxWidth,
+    imageStageHeight: zoomOut ? 760 : canvaTemplate.height
   } as const;
 }
 
@@ -175,7 +176,7 @@ export async function renderTemplateGraphic(input: GraphicInput) {
           fontFamily: canvaTemplate.layout.fontFace
         }}
       >
-        {imageSource ? <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: canvaTemplate.colors.darkBlue }}><img src={imageSource} alt="" width={canvaTemplate.width} height={canvaTemplate.height} style={{ width: canvaTemplate.width, height: canvaTemplate.height, objectFit: layout.imageFit, objectPosition: layout.imagePosition }} /></div> : <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: canvaTemplate.colors.darkBlue, color: "rgba(255,255,255,0.82)", fontFamily: canvaTemplate.layout.fontFace, fontSize: 28, letterSpacing: 3 }}>IMAGE UNAVAILABLE</div>}
+        {imageSource ? <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: layout.imageStageHeight, display: "flex", alignItems: "center", justifyContent: "center", background: canvaTemplate.colors.darkBlue, overflow: "hidden" }}><img src={imageSource} alt="" width={canvaTemplate.width} height={canvaTemplate.height} style={{ width: canvaTemplate.width, height: layout.imageStageHeight, objectFit: layout.imageFit, objectPosition: layout.imagePosition }} /></div> : <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: canvaTemplate.colors.darkBlue, color: "rgba(255,255,255,0.82)", fontFamily: canvaTemplate.layout.fontFace, fontSize: 28, letterSpacing: 3 }}>IMAGE UNAVAILABLE</div>}
         <div
           style={{
             position: "absolute",

@@ -39,7 +39,7 @@ export default function ReviewPage() {
       if (!response.ok) setError(payload.error);
       else {
         const allPosts = queryId ? [payload] : (payload.posts || []);
-        setReviewQueue(queryId ? [] : allPosts.filter((item: WorkspacePost) => ["PENDING_REVIEW", "REVISION", "APPROVED", "REJECTED"].includes(item.status)));
+        setReviewQueue(queryId ? [] : allPosts.filter((item: WorkspacePost) => ["PENDING_REVIEW", "REVISION"].includes(item.status)));
         const next = queryId ? payload : allPosts.find((item: WorkspacePost) => ["PENDING_REVIEW", "REVISION"].includes(item.status));
         setPost(next ?? null);
         setCopy(next ? `${next.caption}\n\n${next.hashtags.join(" ")}` : "");
@@ -60,7 +60,7 @@ export default function ReviewPage() {
     const response = await fetch(`/api/posts/${post.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status, caption, hashtags, feedbackNote }) });
     const payload = await response.json();
     if (!response.ok) setError(payload.error);
-    else { setPost(payload); setCopy(`${payload.caption}\n\n${payload.hashtags.join(" ")}`); setReviewQueue(current => current.map(item => item.id === payload.id ? payload : item)); }
+    else { setPost(payload); setCopy(`${payload.caption}\n\n${payload.hashtags.join(" ")}`); setReviewQueue(current => status === "APPROVED" || status === "REJECTED" ? current.filter(item => item.id !== payload.id) : current.map(item => item.id === payload.id ? payload : item)); }
     setTransitioning(false);
   }
 
@@ -117,11 +117,11 @@ export default function ReviewPage() {
 
   if (loading) return <div className="card loading-state"><Spinner label="Loading your review workspace…" /><div className="skeleton skeleton-wide" /><div className="skeleton" /></div>;
   if (error) return <div className="card empty error-panel">{error}</div>;
-  if (!post) return <div className="card empty">No posts are waiting for review. <a href="/library">Browse live sources →</a></div>;
+  if (!post) return <div className="card empty">No posts are waiting for review. Approved posts are available in <a href="/queue">Ready to post →</a> or <a href="/library">browse live sources →</a>.</div>;
 
   return <>
     <div className="page-intro"><div><p className="eyebrow">CONTENT PIPELINE / REVIEW</p><h2>Social post preview</h2><p>Source image, Canva-style 4:5 graphic, caption, and hashtags ready for review.</p></div><span className="count">{post.category}</span></div>
-    {reviewQueue.length ? <div className="card review-queue"><div className="review-queue-heading"><div><p className="eyebrow">YOUR REVIEW QUEUE</p><h3>{reviewQueue.filter(item => !["APPROVED", "REJECTED"].includes(item.status)).length} waiting for approval</h3></div><span className="mini-label">Approved and rejected posts stay logged here</span></div><div className="review-queue-list">{reviewQueue.map(item=><a key={item.id} className={`review-queue-item ${item.id === post.id ? "selected" : ""}`} href={`/review?id=${item.id}`}><span className={`queue-item-icon ${item.status === "REJECTED" ? "queue-item-rejected" : ""}`}>{item.status === "APPROVED" ? "✓" : item.status === "REJECTED" ? "×" : "•"}</span><span><strong>{item.topicHeading}</strong><small>{item.articleTitle}</small></span><span className={`status ${item.status === "APPROVED" ? "status-published" : item.status === "REJECTED" ? "status-rejected" : ""}`}>{item.status.replace("_", " ")}</span></a>)}</div></div> : null}
+    {reviewQueue.length ? <div className="card review-queue"><div className="review-queue-heading"><div><p className="eyebrow">YOUR REVIEW QUEUE</p><h3>{reviewQueue.length} waiting for approval</h3></div><span className="mini-label">Approved posts move to Ready to post</span></div><div className="review-queue-list">{reviewQueue.map(item=><a key={item.id} className={`review-queue-item ${item.id === post.id ? "selected" : ""}`} href={`/review?id=${item.id}`}><span className="queue-item-icon">•</span><span><strong>{item.topicHeading}</strong><small>{item.articleTitle}</small></span><span className="status">{item.status.replace("_", " ")}</span></a>)}</div></div> : null}
     <div className="review-layout">
       <article className="card preview-card">{sourceWarning ? <div className="warning-panel">{sourceWarning}</div> : null}
         <div className="post-main"><div className={graphicLoading ? "graphic graphic-loading" : "graphic"}>{graphicLoading ? <div className="graphic-status"><Spinner label={regenerating ? "Regenerating…" : "Rendering branded graphic…"} /></div> : null}{graphicError ? <div className="graphic-status error-panel">Graphic rendering failed. Try regenerate.</div> : null}<Image key={post.graphicPath} src={post.graphicPath} alt="Savvy Cyber Kids social post preview" width={1080} height={1350} sizes="(max-width: 900px) 100vw, 55vw" priority onLoad={() => setGraphicLoading(false)} onError={() => { setGraphicLoading(false); setGraphicError(true); }} /></div><div className="post-copy"><span className={post.status === "REJECTED" ? "status status-rejected" : "status"}>{post.status.replace("_", " ")}</span><h2>{post.topicHeading}</h2><p className="meta">{new Date(post.publishedAt).toLocaleDateString()} · <a href={post.externalUrl || post.sourceUrl} target="_blank" rel="noreferrer">Open source article ↗</a></p><h3>{post.articleTitle}</h3><label className="caption-label" htmlFor="copy">Caption + hashtags</label><textarea className="edit-area copy-editor" id="copy" value={copy} onChange={e=>setCopy(e.target.value)} /><small className="field-hint">Keep four hashtags on the final line. The two required Savvy Cyber Kids tags stay included.</small></div></div>
