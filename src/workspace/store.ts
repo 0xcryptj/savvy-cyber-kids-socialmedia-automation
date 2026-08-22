@@ -27,6 +27,7 @@ export function dedupePosts(posts: WorkspacePost[]): WorkspacePost[] {
   const seen = new Set<string>();
   return [...posts]
     .map(normalizePost)
+    .filter((post) => !post.supersededBy)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .filter((post) => {
       const key = postKey(post);

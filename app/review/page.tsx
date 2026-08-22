@@ -82,13 +82,14 @@ export default function ReviewPage() {
 
   async function regenerate() {
     if (!post || regenerating) return;
+    const previousPostId = post.id;
     setRegenerating(true); setGraphicLoading(true); setGraphicError(false); setError(null);
     try {
       const response = await fetch(`/api/posts/${post.id}/regenerate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reviewerGuidance: feedbackNote }) });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Regeneration failed");
       setPost(payload); setCopy(`${payload.caption}\n\n${payload.hashtags.join(" ")}`); setFeedbackNote(""); setSourceWarning(payload.graphicGenerationStatus === "SOURCE_FALLBACK" ? "AI graphic generation was unavailable — this preview is using the source image. Check the server log and OpenAI image settings." : payload.usedFallbackSource ? "Source article couldn't be refreshed — this uses the previous content." : null);
-      setReviewQueue(current => [payload, ...current]);
+      setReviewQueue(current => [payload, ...current.filter(item => item.id !== previousPostId)]);
       window.history.replaceState({}, "", `/review?id=${payload.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Regeneration failed");

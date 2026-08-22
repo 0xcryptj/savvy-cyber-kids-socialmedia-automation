@@ -18,6 +18,7 @@ export type WorkspacePost = {
   graphicGuidance?: string;
   graphicPath: string;
   frozenGraphicPath?: string;
+  supersededBy?: string;
   publishedAt: string;
   createdAt: string;
   approvedAt?: string;

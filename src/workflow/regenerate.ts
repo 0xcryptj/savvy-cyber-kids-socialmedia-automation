@@ -53,6 +53,7 @@ export async function regeneratePost(id: string, reviewerGuidance?: string): Pro
     }
   }
   const nextId = `post_${randomUUID().slice(0, 8)}`;
+  await savePost({ ...previous, status: "SUPERSEDED", supersededBy: nextId, frozenGraphicPath: undefined });
   return savePost({
     ...previous,
     id: nextId,
@@ -68,6 +69,7 @@ export async function regeneratePost(id: string, reviewerGuidance?: string): Pro
     graphicGenerationStatus: generatedImageUrl ? "AI_GENERATED" : article.featuredImageUrl ? "SOURCE_ARTICLE" : "SOURCE_FALLBACK",
     graphicPath: `/api/graphic/${nextId}`,
     frozenGraphicPath: undefined,
+    supersededBy: undefined,
     graphicGuidance: [guidance, generatedRaw.graphic_guidance].filter(Boolean).join(" ").slice(0, 1000) || undefined,
     usedFallbackSource,
     createdAt: new Date().toISOString(),
