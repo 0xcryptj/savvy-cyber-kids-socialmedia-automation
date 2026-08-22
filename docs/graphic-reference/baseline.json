@@ -1,0 +1,136 @@
+{
+  "description": "Approved graphics accepted as the house standard. Regenerate with npm run graphics:record.",
+  "recordedAt": "2026-08-22",
+  "referenceSize": {
+    "width": 540,
+    "height": 675
+  },
+  "differenceTolerance": 1.5,
+  "excluded": [
+    "post_954d1aa7"
+  ],
+  "entries": [
+    {
+      "id": "post_3a1a1403",
+      "category": "blog",
+      "reference": "post_3a1a1403.jpg",
+      "input": {
+        "topicHeading": "DIGITAL PARENTING",
+        "articleTitle": "Toy Meets Tech",
+        "imageUrl": "https://savvycyberkids.org/wp-content/uploads/2026/06/blog-toy-meets-tech.jpg"
+      }
+    },
+    {
+      "id": "post_fa3aca29",
+      "category": "blog",
+      "reference": "post_fa3aca29.jpg",
+      "input": {
+        "topicHeading": "News Consumption Awareness",
+        "articleTitle": "Where Do You Get Your News?",
+        "imageUrl": "https://savvycyberkids.org/wp-content/uploads/2026/01/blog-where-do-you-get-your-news.jpg",
+        "graphicGuidance": "zoom breaking news image out the endges are cut off  zoom breaking news image out the edges are cut off"
+      }
+    },
+    {
+      "id": "post_1b1710ee",
+      "category": "blog",
+      "reference": "post_1b1710ee.jpg",
+      "input": {
+        "topicHeading": "DIGITAL PARENTING",
+        "articleTitle": "We Lost Our Way. It’s Not too Late to Get Back on Track.",
+        "imageUrl": "https://savvycyberkids.org/wp-content/uploads/2026/04/blog-we-lost-our-way.jpg"
+      }
+    },
+    {
+      "id": "post_d8bbb0ac",
+      "category": "blog",
+      "reference": "post_d8bbb0ac.jpg",
+      "input": {
+        "topicHeading": "Online Age Deception",
+        "articleTitle": "Born Yesterday, 18 Today: The Culture of Online Age Deception",
+        "imageUrl": "https://savvycyberkids.org/wp-content/uploads/2026/06/blog-born-yesterday-18-today.jpg"
+      }
+    },
+    {
+      "id": "post_674d17bb",
+      "category": "blog",
+      "reference": "post_674d17bb.jpg",
+      "input": {
+        "topicHeading": "Using AI Responsibly in Education",
+        "articleTitle": "From Flash Cards to Essays: How to Use AI Without Cheating",
+        "imageUrl": "https://savvycyberkids.org/wp-content/uploads/2026/01/blog-how-to-use-AI-without-cheating.jpg",
+        "graphicGuidance": "move the laptop up a little bit the text is a bit hard to read  move the laptop up a little bit to enhance text readability"
+      }
+    },
+    {
+      "id": "post_4a7cca30",
+      "category": "blog",
+      "reference": "post_4a7cca30.jpg",
+      "input": {
+        "topicHeading": "Online Safety",
+        "articleTitle": "Is the Person Behind the Screen Who They Claim to Be? Think Again!",
+        "imageUrl": "https://savvycyberkids.org/wp-content/uploads/2026/06/blog-is-the-person-behind-the-screen.jpg"
+      }
+    },
+    {
+      "id": "post_d9ca99dc",
+      "category": "blog",
+      "reference": "post_d9ca99dc.jpg",
+      "input": {
+        "topicHeading": "Understanding Social Media's Impact on Kids",
+        "articleTitle": "How Social Media Was Built to Keep Kids Hooked",
+        "imageUrl": "https://savvycyberkids.org/wp-content/uploads/2026/06/blog-How-Social-Media-Was-Built-to-Keep-Kids-Hooked.jpg"
+      }
+    },
+    {
+      "id": "post_ff8c929f",
+      "category": "blog",
+      "reference": "post_ff8c929f.jpg",
+      "input": {
+        "topicHeading": "Digital Safety at Parties",
+        "articleTitle": "Protecting Yourself at Parties",
+        "imageUrl": "https://savvycyberkids.org/wp-content/uploads/2026/01/blog-protest-yourself-at-parties.jpg"
+      }
+    },
+    {
+      "id": "post_63fd3716",
+      "category": "blog",
+      "reference": "post_63fd3716.jpg",
+      "input": {
+        "topicHeading": "Healthy Gaming Habits for Families",
+        "articleTitle": "More Than Just a Game: What Violent Video Games Mean for Today’s Youth",
+        "imageUrl": "https://savvycyberkids.org/wp-content/uploads/2026/06/blog-more-than-just-a-game.jpg"
+      }
+    },
+    {
+      "id": "post_ff4cbd49",
+      "category": "blog",
+      "reference": "post_ff4cbd49.jpg",
+      "input": {
+        "topicHeading": "Digital Citizenship",
+        "articleTitle": "The Digital Leftovers We Leave Behind",
+        "imageUrl": "https://savvycyberkids.org/wp-content/uploads/2026/06/blog-digital-leftovers.jpg"
+      }
+    },
+    {
+      "id": "post_479b36ce",
+      "category": "blog",
+      "reference": "post_479b36ce.jpg",
+      "input": {
+        "topicHeading": "Helping Each Other Without Risking Grades",
+        "articleTitle": "Think Before You Share: How to Help Friends Without Giving Away Your Homework",
+        "imageUrl": "https://savvycyberkids.org/wp-content/uploads/2026/01/blog-think-before-you-share.jpg"
+      }
+    },
+    {
+      "id": "post_55ab6687",
+      "category": "blog",
+      "reference": "post_55ab6687.jpg",
+      "input": {
+        "topicHeading": "Cyber Safety Tips for Families",
+        "articleTitle": "Think Before You Tap: The Hidden Danger of Random Links",
+        "imageUrl": "https://savvycyberkids.org/wp-content/uploads/2026/01/blog-think-before-you-tap.jpg"
+      }
+    }
+  ]
+}

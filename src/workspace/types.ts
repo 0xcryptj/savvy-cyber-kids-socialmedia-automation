@@ -16,6 +16,8 @@ export type WorkspacePost = {
   generatedImageUrl?: string;
   graphicGenerationStatus?: "AI_GENERATED" | "SOURCE_ARTICLE" | "SOURCE_FALLBACK";
   graphicGuidance?: string;
+  /** Source image is a designed graphic that must not be cropped. */
+  sourceImageHasText?: boolean;
   graphicPath: string;
   frozenGraphicPath?: string;
   supersededBy?: string;

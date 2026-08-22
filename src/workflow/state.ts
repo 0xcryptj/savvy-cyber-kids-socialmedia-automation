@@ -17,7 +17,10 @@ export type PostStatus = (typeof PostStatus)[keyof typeof PostStatus];
 const transitions: Record<PostStatus, readonly PostStatus[]> = {
   DISCOVERED: ["GENERATING", "FAILED"], GENERATING: ["PENDING_REVIEW", "FAILED"],
   PENDING_REVIEW: ["REVISION", "REJECTED", "APPROVED", "FAILED"], REVISION: ["PENDING_REVIEW", "FAILED"],
-  REJECTED: [], APPROVED: ["QUEUED", "PUBLISHED", "FAILED"], QUEUED: ["SCHEDULED", "FAILED"],
+  // Approved and queued posts can be pulled back into review: approval is a
+  // judgement call and reviewers do misclick. Scheduled posts are deliberately
+  // not reversible here, because the schedule already exists in Postiz.
+  REJECTED: [], APPROVED: ["QUEUED", "PUBLISHED", "PENDING_REVIEW", "FAILED"], QUEUED: ["SCHEDULED", "PENDING_REVIEW", "FAILED"],
   SCHEDULED: ["PUBLISHED", "FAILED"], PUBLISHED: [], FAILED: ["DISCOVERED", "GENERATING", "QUEUED"], SUPERSEDED: []
 };
 

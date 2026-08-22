@@ -23,7 +23,8 @@ export async function processArticle(input: { canonicalUrl: string; category: Co
   }
 
   const article = await hydrateArticle(found ?? selected!);
-  const generated = finalizeGeneratedPost(await generateSocialPost(article));
+  const generatedRaw = await generateSocialPost(article);
+  const generated = finalizeGeneratedPost(generatedRaw);
   let generatedImageUrl: string | undefined;
   if (!(await articleImageAvailable(article.featuredImageUrl))) {
     try {
@@ -48,6 +49,7 @@ export async function processArticle(input: { canonicalUrl: string; category: Co
     featuredImageUrl: article.featuredImageUrl,
     generatedImageUrl,
     graphicGenerationStatus: generatedImageUrl ? "AI_GENERATED" : article.featuredImageUrl ? "SOURCE_ARTICLE" : "SOURCE_FALLBACK",
+    sourceImageHasText: generatedRaw.source_image_has_text || undefined,
     graphicPath: `/api/graphic/${id}`,
     publishedAt: article.publishedAt,
     createdAt: new Date().toISOString()

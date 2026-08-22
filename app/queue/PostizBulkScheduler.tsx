@@ -13,7 +13,11 @@ function defaultDate() {
 }
 
 export function PostizBulkScheduler({ posts }: { posts: WorkspacePost[] }) {
+  const [livePosts, setLivePosts] = useState(posts);
   const [selectedPosts, setSelectedPosts] = useState<string[]>([]);
+  const [sendBackId, setSendBackId] = useState<string | null>(null);
+  const [sendBackNote, setSendBackNote] = useState("");
+  const [sendingBack, setSendingBack] = useState(false);
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
   const [date, setDate] = useState(defaultDate);
@@ -21,9 +25,36 @@ export function PostizBulkScheduler({ posts }: { posts: WorkspacePost[] }) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const allSelected = posts.length > 0 && selectedPosts.length === posts.length;
+  const allSelected = livePosts.length > 0 && selectedPosts.length === livePosts.length;
   const selectedCount = selectedPosts.length;
-  const selectedCaptions = useMemo(() => posts.filter(post => selectedPosts.includes(post.id)), [posts, selectedPosts]);
+  const selectedCaptions = useMemo(() => livePosts.filter(post => selectedPosts.includes(post.id)), [livePosts, selectedPosts]);
+
+  function openSendBack(id: string) {
+    setSendBackId(current => (current === id ? null : id));
+    setSendBackNote("");
+    setMessage(null);
+  }
+
+  async function sendBackToReview(id: string) {
+    setSendingBack(true); setMessage(null);
+    try {
+      const response = await fetch(`/api/posts/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "PENDING_REVIEW", feedbackNote: sendBackNote })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not send the post back");
+      setLivePosts(current => current.filter(post => post.id !== id));
+      setSelectedPosts(current => current.filter(item => item !== id));
+      setSendBackId(null); setSendBackNote("");
+      setMessage("Moved back to the review queue.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not send the post back");
+    } finally {
+      setSendingBack(false);
+    }
+  }
 
   function togglePost(id: string) {
     setSelectedPosts(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
@@ -53,9 +84,9 @@ export function PostizBulkScheduler({ posts }: { posts: WorkspacePost[] }) {
   }
 
   return <>
-    <div className="queue-toolbar card"><div><p className="eyebrow">BULK SCHEDULING</p><strong>{selectedCount ? `${selectedCount} selected` : "Select approved content"}</strong><span className="field-hint">Preview the package here before sending it to Postiz.</span></div><div className="queue-toolbar-actions"><button className="outline" onClick={() => setSelectedPosts(allSelected ? [] : posts.map(post => post.id))}>{allSelected ? "Clear all" : "Select all"}</button><button onClick={loadChannels} disabled={!selectedCount || loadingChannels}>{loadingChannels ? <Spinner label="Loading channels…" /> : "Choose schedule"}</button></div></div>
+    <div className="queue-toolbar card"><div><p className="eyebrow">BULK SCHEDULING</p><strong>{selectedCount ? `${selectedCount} selected` : "Select approved content"}</strong><span className="field-hint">Preview the package here before sending it to Postiz.</span></div><div className="queue-toolbar-actions"><button className="outline" onClick={() => setSelectedPosts(allSelected ? [] : livePosts.map(post => post.id))}>{allSelected ? "Clear all" : "Select all"}</button><button onClick={loadChannels} disabled={!selectedCount || loadingChannels}>{loadingChannels ? <Spinner label="Loading channels…" /> : "Choose schedule"}</button></div></div>
     {selectedCount ? <section className="card bulk-schedule-panel"><div className="bulk-panel-heading"><div><p className="eyebrow">POSTIZ DELIVERY</p><h3>Schedule {selectedCount} approved post{selectedCount === 1 ? "" : "s"}</h3></div><span className="status">{selectedChannels.length} channel{selectedChannels.length === 1 ? "" : "s"}</span></div><div className="bulk-schedule-grid"><label>Publish date and time<input type="datetime-local" value={date} onChange={event => setDate(event.target.value)} /></label><div><p className="field-hint">Connected Postiz channels</p>{loadingChannels ? <Spinner label="Loading channels…" /> : integrations.length ? <div className="postiz-channel-list">{integrations.map(integration => <label className="postiz-channel" key={integration.id}><input type="checkbox" checked={selectedChannels.includes(integration.id)} onChange={() => toggleChannel(integration.id)} /><span>{integration.name}</span><small>{integration.profile || integration.identifier}</small></label>)}</div> : <p className="field-hint">Select “Choose schedule” to load channels.</p>}</div></div><div className="actions"><button onClick={schedule} disabled={saving || !selectedChannels.length || !date || !integrations.length}>{saving ? <Spinner label="Scheduling…" /> : `Schedule ${selectedCount} post${selectedCount === 1 ? "" : "s"} in Postiz`}</button>{message ? <span className={message.includes("failed") || message.includes("Could not") ? "error-text" : "copy-confirm"}>{message}</span> : null}</div></section> : null}
-    <div className="bulk-post-list">{posts.map(post => <article className={`card bulk-post-card ${selectedPosts.includes(post.id) ? "selected" : ""}`} key={post.id}><label className="bulk-post-select"><input type="checkbox" checked={selectedPosts.includes(post.id)} onChange={() => togglePost(post.id)} aria-label={`Select ${post.articleTitle}`} /><span /></label><div className="bulk-post-media"><img src={post.graphicPath} alt="" /></div><div className="bulk-post-copy"><div className="bulk-post-meta"><span className="status">APPROVED</span><span>{post.category}</span></div><h3>{post.topicHeading}</h3><p className="bulk-article-title">{post.articleTitle}</p><p>{post.caption}</p><p className="hashtags">{post.hashtags.join(" ")}</p></div></article>)}</div>
+    <div className="bulk-post-list">{livePosts.map(post => <article className={`card bulk-post-card ${selectedPosts.includes(post.id) ? "selected" : ""}`} key={post.id}><label className="bulk-post-select"><input type="checkbox" checked={selectedPosts.includes(post.id)} onChange={() => togglePost(post.id)} aria-label={`Select ${post.articleTitle}`} /><span /></label><div className="bulk-post-media"><img src={post.graphicPath} alt="" /></div><div className="bulk-post-copy"><div className="bulk-post-meta"><span className="status">APPROVED</span><span>{post.category}</span></div><h3>{post.topicHeading}</h3><p className="bulk-article-title">{post.articleTitle}</p><p>{post.caption}</p><p className="hashtags">{post.hashtags.join(" ")}</p><div className="bulk-post-actions"><a className="button outline" href={`/review?id=${post.id}`}>Open in review ↗</a><button type="button" className="outline" onClick={() => openSendBack(post.id)} disabled={sendingBack}>{sendBackId === post.id ? "Cancel" : "Send back for review"}</button></div>{sendBackId === post.id ? <div className="send-back-panel"><label htmlFor={`send-back-${post.id}`}>Why is it going back? <small>Optional. This also becomes the graphic guidance for the next render.</small></label><textarea id={`send-back-${post.id}`} value={sendBackNote} onChange={event => setSendBackNote(event.target.value)} maxLength={1000} placeholder="e.g. zoom out, the logo is cut off" /><button type="button" onClick={() => sendBackToReview(post.id)} disabled={sendingBack}>{sendingBack ? <Spinner label="Moving…" /> : "Move back to review"}</button></div> : null}</div></article>)}</div>
     {selectedCaptions.length > 1 ? <p className="field-hint bulk-selection-note">You’re scheduling these as separate posts at the same scheduled time across the selected Postiz channels.</p> : null}
   </>;
 }

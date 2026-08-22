@@ -43,6 +43,19 @@ export async function transitionPost(id: string, next: PostStatus, patch?: Parti
   if (next === "APPROVED") {
     updated = { ...updated, frozenGraphicPath: await freezePostGraphic(updated) };
   }
+  if (next === "PENDING_REVIEW" && (post.status === "APPROVED" || post.status === "QUEUED")) {
+    // Drop the frozen artifact and the pipeline stamps so the post behaves like
+    // a fresh review item. Any note the reviewer gave for sending it back also
+    // becomes graphic guidance, so the preview reflects the reason immediately.
+    const note = feedbackNote?.trim();
+    updated = {
+      ...updated,
+      frozenGraphicPath: undefined,
+      approvedAt: undefined,
+      queuedAt: undefined,
+      ...(note ? { graphicGuidance: note.slice(0, 1000) } : {})
+    };
+  }
   updated = await savePost(updated);
   if (next === "APPROVED" || next === "REJECTED") await recordFeedback({ postId: updated.id, category: updated.category, status: next, topicHeading: updated.topicHeading, articleTitle: updated.articleTitle, note: feedbackNote?.trim() || undefined, createdAt: new Date().toISOString() });
   return updated;

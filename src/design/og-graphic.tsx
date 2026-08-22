@@ -10,6 +10,7 @@ type GraphicInput = {
   articleTitle: string;
   imageUrl?: string;
   graphicGuidance?: string;
+  sourceImageHasText?: boolean;
 };
 
 async function loadLogo() {
@@ -152,7 +153,11 @@ function titleFit(title: string, highlight: string, intent: GraphicIntent, maxWi
   for (let fontSize = Math.round(132 * requestedScale); fontSize >= 24; fontSize -= 2) {
     const lineHeight = Math.round(fontSize * lineSpacing);
     const lines = wrapTitle(normalizedTitle, fontSize, maxWidth);
-    if (lines.length * lineHeight <= titleAreaHeight) return { fontSize, lineHeight, lines, highlightStart, highlightEnd };
+    // Height alone is not enough. wrapTitle cannot break a single word, so one
+    // long word ("CYBERSECURITY") stays on its own oversized line and runs off
+    // the canvas. Require every line to fit horizontally too.
+    const widthFits = lines.every((line) => estimatedWidth(line.text, fontSize) <= maxWidth);
+    if (lines.length * lineHeight <= titleAreaHeight && widthFits) return { fontSize, lineHeight, lines, highlightStart, highlightEnd };
   }
 
   const fontSize = 24;
@@ -174,6 +179,9 @@ function headingScale(heading: string) {
   return Math.max(24, Math.min(headingFontMax, Math.round(980 / Math.max(heading.length, 12))));
 }
 
+// Sits behind a contained image, where the photo does not reach the edges.
+const brandGround = "linear-gradient(160deg, #0a3151 0%, #072541 52%, #04182a 100%)";
+
 // Every ramp starts fully transparent. The variants change how fast the scrim
 // deepens, never whether it begins with a hard edge.
 const scrimRamps = {
@@ -193,11 +201,8 @@ export async function renderTemplateGraphic(input: GraphicInput) {
   ]);
   const { highlight } = highlightedTitleParts(input.articleTitle);
   const heading = input.topicHeading.toUpperCase();
-  const intent = parseGraphicIntent(input.graphicGuidance);
+  const intent = parseGraphicIntent(input.graphicGuidance, input.sourceImageHasText);
   const scaledTitle = titleFit(input.articleTitle, highlight, intent, intent.titleWidth);
-  // A contained image leaves letterbox voids; a dimmed cover-scaled copy of
-  // the same photo fills them so the frame still reads as full-bleed.
-  const showBackdrop = intent.fit === "contain";
 
   return new ImageResponse(
     (
@@ -212,11 +217,11 @@ export async function renderTemplateGraphic(input: GraphicInput) {
         }}
       >
         {imageSource ? (
-          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: canvaTemplate.colors.darkBlue }}>
-            {/* A contained image would otherwise sit in flat letterbox voids.
-                Filling them with a dimmed cover-scaled copy of the same photo
-                keeps the frame full-bleed while the artwork stays uncropped. */}
-            {showBackdrop ? <img src={imageSource} alt="" width={canvaTemplate.width} height={canvasHeight} style={{ position: "absolute", inset: 0, width: canvaTemplate.width, height: canvasHeight, objectFit: "cover", objectPosition: "center", opacity: 0.35 }} /> : null}
+          // A contained image leaves space above and below it. Filling that with
+          // a zoomed copy of the same photo reads as a rendering mistake — the
+          // artwork appears twice, once ghosted. Use a plain brand ground so the
+          // uncropped image sits in a deliberate frame instead.
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", backgroundImage: brandGround }}>
             <img src={imageSource} alt="" width={canvaTemplate.width} height={canvasHeight} style={{ position: "relative", width: canvaTemplate.width, height: canvasHeight, objectFit: intent.fit, objectPosition: intent.focus }} />
           </div>
         ) : (

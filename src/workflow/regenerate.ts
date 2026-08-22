@@ -67,6 +67,7 @@ export async function regeneratePost(id: string, reviewerGuidance?: string): Pro
     featuredImageUrl: article.featuredImageUrl,
     generatedImageUrl,
     graphicGenerationStatus: generatedImageUrl ? "AI_GENERATED" : article.featuredImageUrl ? "SOURCE_ARTICLE" : "SOURCE_FALLBACK",
+    sourceImageHasText: generatedRaw.source_image_has_text || undefined,
     graphicPath: `/api/graphic/${nextId}`,
     frozenGraphicPath: undefined,
     supersededBy: undefined,

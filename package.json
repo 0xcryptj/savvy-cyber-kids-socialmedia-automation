@@ -14,7 +14,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "graphics:record": "tsx scripts/graphics-baseline.mjs record",
+    "graphics:verify": "tsx scripts/graphics-baseline.mjs verify"
   },
   "dependencies": {
     "@libsql/client": "^0.14.0",

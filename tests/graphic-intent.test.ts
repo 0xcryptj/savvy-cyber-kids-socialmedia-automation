@@ -82,6 +82,21 @@ describe("parseGraphicIntent", () => {
     expect(parseGraphicIntent("").focus).toBe("center 24%");
   });
 
+  it("shows the whole frame when the source is a designed graphic", () => {
+    // The vision model flags banners, title cards and infographics, whose own
+    // words are destroyed by the default crop.
+    expect(parseGraphicIntent(undefined, true).fit).toBe("contain");
+    expect(parseGraphicIntent("center the subject", true).fit).toBe("contain");
+  });
+
+  it("still lets a reviewer crop a flagged graphic on purpose", () => {
+    expect(parseGraphicIntent("zoom in on the logo", true).fit).toBe("cover");
+  });
+
+  it("keeps cropping when the source is an ordinary photograph", () => {
+    expect(parseGraphicIntent(undefined, false).fit).toBe("cover");
+  });
+
   it("does not mistake ordinary copy guidance for a layout change", () => {
     const intent = parseGraphicIntent("Make the caption warmer and mention parents.");
     expect(intent.fit).toBe("cover");

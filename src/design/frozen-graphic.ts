@@ -10,7 +10,8 @@ function graphicInput(post: WorkspacePost) {
     topicHeading: post.topicHeading,
     articleTitle: post.articleTitle,
     imageUrl: post.generatedImageUrl || post.featuredImageUrl,
-    graphicGuidance: post.graphicGuidance
+    graphicGuidance: post.graphicGuidance,
+    sourceImageHasText: post.sourceImageHasText
   };
 }
 

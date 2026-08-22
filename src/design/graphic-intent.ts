@@ -38,9 +38,14 @@ const smallerTitle = /\bsmaller\b|reduce (?:the )?(?:headline|title|text|copy)|s
 const looserSpacing = /\bspacing\b|space (?:it )?out|breathing room|\bseparate\b|cramped|too tight|crowded/i;
 const saferLayout = /safer[_ ]layout|safe layout|avoid overlap|no overlap|fix cut|prevent cut|question[\s-]?mark|punctuation/i;
 
-export function parseGraphicIntent(guidance?: string): GraphicIntent {
+/**
+ * @param sourceImageHasText the source is a designed graphic (banner, title
+ * card, infographic) whose own words would be destroyed by a crop. Detected
+ * by the vision model at generation time.
+ */
+export function parseGraphicIntent(guidance?: string, sourceImageHasText?: boolean): GraphicIntent {
   const text = guidance?.trim() || "";
-  const wantsFullImage = showFullImage.test(text);
+  const wantsFullImage = showFullImage.test(text) || Boolean(sourceImageHasText);
   const wantsCrop = zoomIn.test(text);
 
   return {

@@ -7,7 +7,10 @@ export const generatedSocialPostSchema = z.object({
   article_title: z.string().trim().min(1),
   caption: z.string().trim().min(1).max(2_200),
   hashtags: z.array(hashtag).length(2),
-  graphic_guidance: z.string().trim().max(500).optional()
+  graphic_guidance: z.string().trim().max(500).optional(),
+  // True only when the source image is a designed graphic whose own words
+  // would be lost to a crop (a banner, title card, infographic, or poster).
+  source_image_has_text: z.boolean().optional()
 });
 
 export type GeneratedSocialPost = z.infer<typeof generatedSocialPostSchema>;

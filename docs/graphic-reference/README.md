@@ -36,7 +36,42 @@ npx tsx -e '
   })'
 ```
 
+## Approved baseline
+
+`approved/` holds the graphics that were reviewed and approved as good, and
+`baseline.json` records the exact inputs that produced each one.
+
+```bash
+npm run graphics:verify   # re-render those inputs and report drift
+npm run graphics:record   # re-snapshot after approving new graphics
+```
+
+`verify` fails when any graphic drifts more than `differenceTolerance` percent
+from its reference, so a renderer change that wrecks the composition is caught
+before it reaches the review queue. Run it before and after touching
+`src/design/og-graphic.tsx`. It fetches the original article images, so it needs
+network access; that is why it is a script rather than part of `npm test`.
+
+Around 1% drift is normal — the references are stored as JPEG. A real layout
+regression shows up as several percent across every graphic at once.
+
+`npm run graphics:record` reads approved posts out of `storage/workspace.json`,
+which is local to your machine. Pass post ids to leave out:
+
+```bash
+npm run graphics:record -- post_954d1aa7
+```
+
+## Framing
+
 Reviewer guidance (the "Copy + graphic improvement" box) is parsed by
 `src/design/graphic-intent.ts` and covered by `tests/graphic-intent.test.ts`.
 If a phrasing is being ignored, add it there with a test rather than adding a
 regex to the renderer.
+
+The full frame is shown instead of cropped when the reviewer asks for it, or
+when the vision model sets `source_image_has_text` — a designed graphic such as
+a news banner or title card, whose own words would be destroyed by the default
+crop. Ordinary photographs stay full-bleed. Crop percentage is deliberately not
+used as the signal: every Savvy Cyber Kids blog image is 800x533 and loses the
+same 47% to the crop, so it separates nothing.
