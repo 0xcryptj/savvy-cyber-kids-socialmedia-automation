@@ -40,7 +40,9 @@ export async function regeneratePost(id: string, reviewerGuidance?: string): Pro
     // Regeneration remains available when the source feed is temporarily down.
   }
 
-  const generated = finalizeGeneratedPost(await generateSocialPost(article, boundedText(reviewerGuidance, 1000)));
+  const guidance = boundedText(reviewerGuidance, 1000);
+  const generatedRaw = await generateSocialPost(article, guidance);
+  const generated = finalizeGeneratedPost(generatedRaw);
   const nextId = `post_${randomUUID().slice(0, 8)}`;
   return savePost({
     ...previous,
@@ -54,7 +56,7 @@ export async function regeneratePost(id: string, reviewerGuidance?: string): Pro
     externalUrl: article.externalUrl,
     featuredImageUrl: article.featuredImageUrl,
     graphicPath: `/api/graphic/${nextId}`,
-    graphicGuidance: boundedText(reviewerGuidance, 1000) || undefined,
+    graphicGuidance: [guidance, generatedRaw.graphic_guidance].filter(Boolean).join(" ").slice(0, 1000) || undefined,
     usedFallbackSource,
     createdAt: new Date().toISOString(),
     approvedAt: undefined,

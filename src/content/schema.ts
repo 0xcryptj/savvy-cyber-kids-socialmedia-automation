@@ -6,7 +6,8 @@ export const generatedSocialPostSchema = z.object({
   topic_heading: z.string().trim().min(1).max(60),
   article_title: z.string().trim().min(1),
   caption: z.string().trim().min(1).max(2_200),
-  hashtags: z.array(hashtag).length(2)
+  hashtags: z.array(hashtag).length(2),
+  graphic_guidance: z.string().trim().max(500).optional()
 });
 
 export type GeneratedSocialPost = z.infer<typeof generatedSocialPostSchema>;

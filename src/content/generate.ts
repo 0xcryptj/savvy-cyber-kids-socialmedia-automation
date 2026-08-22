@@ -10,7 +10,7 @@ export function finalizeGeneratedPost(input: GeneratedSocialPost) {
   return buildFinalPost(input);
 }
 
-const systemPrompt = `Create a warm, practical Savvy Cyber Kids social post for families. Preserve the article title exactly. Use plain text only: do not use emojis or decorative symbols. Return exactly two topical hashtags; do not include #savvycyberkids or #cyberhero. Respond with JSON only matching this shape: {"topic_heading":"string","article_title":"string","caption":"string","hashtags":["#tag1","#tag2"]}.`;
+const systemPrompt = `Create a warm, practical Savvy Cyber Kids social post for families. Preserve the article title exactly. Use plain text only: do not use emojis or decorative symbols. Return exactly two topical hashtags; do not include #savvycyberkids or #cyberhero. If reviewer guidance includes visual requests, translate them into a short actionable graphic_guidance instruction using only concepts such as zoom_out, contain_image, reduce_text, add_spacing, or safer_layout. Respond with JSON only matching this shape: {"topic_heading":"string","article_title":"string","caption":"string","hashtags":["#tag1","#tag2"],"graphic_guidance":"optional visual instruction"}.`;
 
 async function apiKey(provider: "openai" | "anthropic" | "openai-compatible") {
   const stored = await getStoredCredential(provider);
@@ -26,7 +26,7 @@ async function generateWithProvider(article: SourceArticle, reviewerGuidance?: s
     ? `\n\nRecent human feedback from this feed:\n${feedback.map((item) => `- ${item.status}: ${item.note || "No note supplied"}`).join("\n")}\nUse this as guidance, but preserve the article title and the required output shape.`
     : "";
   const guidanceContext = reviewerGuidance?.trim()
-    ? `\n\nReviewer guidance for this regeneration:\n${reviewerGuidance.trim().slice(0, 1000)}\nApply this guidance to the copy while preserving the article title and output shape.`
+    ? `\n\nReviewer guidance for this regeneration:\n${reviewerGuidance.trim().slice(0, 1000)}\nApply this guidance to the copy and graphic_guidance while preserving the article title and output shape.`
     : "";
   const prompt = `Article title (preserve exactly): ${article.title}\nCategory: ${article.category}\n\nBody:\n${(article.body || article.excerpt).slice(0, 4000)}${feedbackContext}${guidanceContext}`;
   let response: Response;

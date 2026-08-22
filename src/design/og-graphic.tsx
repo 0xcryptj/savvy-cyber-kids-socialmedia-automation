@@ -62,7 +62,7 @@ function Logo({ src }: { src: string }) {
 type TitleWord = { text: string; start: number; end: number };
 type TitleLine = { text: string; start: number; end: number };
 
-const titleMaxWidth = 930;
+const titleMaxWidth = 820;
 // Keep every element inside a safe inset from the black panel. The panel starts
 // lower on the canvas so the source image remains the visual anchor.
 const blackBoxTop = 870;
@@ -73,7 +73,7 @@ const titleMaxHeight = blackBoxBottom - blackBoxTop - blackBoxPaddingTop - black
 
 function estimatedWidth(text: string, fontSize: number) {
   let units = 0;
-  for (const character of text) units += character === " " ? 0.28 : /[A-Z0-9]/.test(character) ? 0.61 : 0.5;
+  for (const character of text) units += character === " " ? 0.34 : /[A-Z0-9]/.test(character) ? 0.66 : 0.62;
   return units * fontSize;
 }
 
@@ -85,14 +85,14 @@ function titleWords(title: string): TitleWord[] {
   }));
 }
 
-function wrapTitle(title: string, fontSize: number): TitleLine[] {
+function wrapTitle(title: string, fontSize: number, maxWidth = titleMaxWidth): TitleLine[] {
   const words = titleWords(title);
   const lines: TitleLine[] = [];
   let current: TitleWord[] = [];
 
   for (const word of words) {
     const candidate = [...current, word].map((item) => item.text).join(" ");
-    if (current.length && estimatedWidth(candidate, fontSize) > titleMaxWidth) {
+    if (current.length && estimatedWidth(candidate, fontSize) > maxWidth) {
       lines.push({ text: title.slice(current[0].start, current[current.length - 1].end), start: current[0].start, end: current[current.length - 1].end });
       current = [word];
     } else {
@@ -103,7 +103,7 @@ function wrapTitle(title: string, fontSize: number): TitleLine[] {
   return lines;
 }
 
-function titleFit(title: string, highlight: string, guidance?: string) {
+function titleFit(title: string, highlight: string, guidance?: string, maxWidth = titleMaxWidth) {
   const normalizedTitle = title.trim().toUpperCase();
   const highlightStart = normalizedTitle.indexOf(highlight.trim().toUpperCase());
   const highlightEnd = highlightStart >= 0 ? highlightStart + highlight.trim().length : -1;
@@ -115,12 +115,12 @@ function titleFit(title: string, highlight: string, guidance?: string) {
   const lineSpacing = /spacing|space out|breathing room|separate/.test(guidanceText) ? 1.14 : 1.06;
   for (let fontSize = Math.round(132 * requestedScale); fontSize >= 22; fontSize -= 2) {
     const lineHeight = Math.round(fontSize * lineSpacing);
-    const lines = wrapTitle(normalizedTitle, fontSize);
+    const lines = wrapTitle(normalizedTitle, fontSize, maxWidth);
     if (lines.length * lineHeight <= titleMaxHeight) return { fontSize, lineHeight, lines, highlightStart, highlightEnd };
   }
 
   const fontSize = 22;
-  return { fontSize, lineHeight: Math.round(fontSize * lineSpacing), lines: wrapTitle(normalizedTitle, fontSize), highlightStart, highlightEnd };
+  return { fontSize, lineHeight: Math.round(fontSize * lineSpacing), lines: wrapTitle(normalizedTitle, fontSize, maxWidth), highlightStart, highlightEnd };
 }
 
 function lineSegments(line: TitleLine, highlightStart: number, highlightEnd: number) {
@@ -135,7 +135,18 @@ function lineSegments(line: TitleLine, highlightStart: number, highlightEnd: num
 }
 
 function headingScale(heading: string) {
-  return Math.max(24, Math.min(36, Math.round(980 / Math.max(heading.length, 12))));
+  return Math.max(20, Math.min(36, Math.round(900 / Math.max(heading.length, 12))));
+}
+
+function graphicLayout(guidance?: string) {
+  const text = guidance?.toLowerCase() || "";
+  const zoomOut = /zoom[\s-]*out|show more|less crop|less cropped|full image|contain_image/.test(text);
+  const saferLayout = /safer_layout|safe layout|avoid overlap|no overlap|fix cut|prevent cut|question mark|punctuation/.test(text);
+  return {
+    imageFit: zoomOut ? "contain" : "cover",
+    imagePosition: zoomOut ? "center center" : "center 24%",
+    titleWidth: saferLayout ? 780 : titleMaxWidth
+  } as const;
 }
 
 export async function renderTemplateGraphic(input: GraphicInput) {
@@ -149,7 +160,8 @@ export async function renderTemplateGraphic(input: GraphicInput) {
   ]);
   const { highlight } = highlightedTitleParts(input.articleTitle);
   const heading = input.topicHeading.toUpperCase();
-  const scaledTitle = titleFit(input.articleTitle, highlight, input.graphicGuidance);
+  const layout = graphicLayout(input.graphicGuidance);
+  const scaledTitle = titleFit(input.articleTitle, highlight, input.graphicGuidance, layout.titleWidth);
 
   return new ImageResponse(
     (
@@ -163,7 +175,7 @@ export async function renderTemplateGraphic(input: GraphicInput) {
           fontFamily: canvaTemplate.layout.fontFace
         }}
       >
-        {imageSource ? <img src={imageSource} alt="" width={canvaTemplate.width} height={canvaTemplate.height} style={{ position: "absolute", inset: 0, width: canvaTemplate.width, height: canvaTemplate.height, objectFit: "cover", objectPosition: "center 24%" }} /> : <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: canvaTemplate.colors.darkBlue, color: "rgba(255,255,255,0.82)", fontFamily: canvaTemplate.layout.fontFace, fontSize: 28, letterSpacing: 3 }}>IMAGE UNAVAILABLE</div>}
+        {imageSource ? <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: canvaTemplate.colors.darkBlue }}><img src={imageSource} alt="" width={canvaTemplate.width} height={canvaTemplate.height} style={{ width: canvaTemplate.width, height: canvaTemplate.height, objectFit: layout.imageFit, objectPosition: layout.imagePosition }} /></div> : <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: canvaTemplate.colors.darkBlue, color: "rgba(255,255,255,0.82)", fontFamily: canvaTemplate.layout.fontFace, fontSize: 28, letterSpacing: 3 }}>IMAGE UNAVAILABLE</div>}
         <div
           style={{
             position: "absolute",
@@ -192,7 +204,7 @@ export async function renderTemplateGraphic(input: GraphicInput) {
             {heading}
           </div>
           <div style={{ width: 860, height: 3, background: canvaTemplate.layout.dividerColor, marginBottom: 28 }} />
-          <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-start", textAlign: "center", fontFamily: canvaTemplate.layout.fontFace, fontSize: scaledTitle.fontSize, fontWeight: canvaTemplate.fontWeights.bold, lineHeight: `${scaledTitle.lineHeight}px`, textTransform: "uppercase", maxWidth: titleMaxWidth, padding: "0 12px", overflow: "hidden" }}>
+          <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-start", textAlign: "center", fontFamily: canvaTemplate.layout.fontFace, fontSize: scaledTitle.fontSize, fontWeight: canvaTemplate.fontWeights.bold, lineHeight: `${scaledTitle.lineHeight}px`, textTransform: "uppercase", maxWidth: layout.titleWidth, padding: "0 12px", overflow: "hidden" }}>
             {scaledTitle.lines.map((line) => <div key={`${line.start}-${line.end}`} style={{ display: "flex", justifyContent: "center", whiteSpace: "nowrap", overflow: "hidden", width: "100%" }}>{lineSegments(line, scaledTitle.highlightStart, scaledTitle.highlightEnd).map((segment, index) => <span key={`${line.start}-${index}`} style={{ color: segment.highlighted ? canvaTemplate.colors.lightBlue : canvaTemplate.colors.white, whiteSpace: "pre" }}>{segment.text}</span>)}</div>)}
           </div>
         </div>
