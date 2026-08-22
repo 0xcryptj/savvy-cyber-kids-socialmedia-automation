@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { designUrls, publishingUrls } from "@/config/urls";
+import { publishingUrls } from "@/config/urls";
 import { WorkspacePost } from "@/src/workspace/types";
 import { Spinner } from "@/app/components/Spinner";
 import { GraphicEditor } from "./GraphicEditor";
+import { CanvaHandoff } from "./CanvaHandoff";
 
 function shareUrl(label: string, articleUrl: string) {
   if (label === "Facebook") return `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(articleUrl)}`;
@@ -155,7 +156,7 @@ export default function ReviewPage() {
       </article>
       <div className="side-stack">
         <div className="card side-card quick-post-card"><p className="eyebrow">QUICK POST</p><h3>Post from your account</h3><p>Use your own logged-in account. No API setup or account connection is required.</p><button className="share-button" onClick={sharePost}>Share graphic + caption <span>↗</span></button><div className="platform-post-grid">{["Instagram", "Facebook", "LinkedIn", "X"].map(label=><button key={label} className="platform-post-button" onClick={()=>quickPlatformPost(label)}><PlatformIcon label={label} />{label}<span>↗</span></button>)}</div>{shareMessage ? <p className="copy-confirm">{shareMessage}</p> : null}</div>
-        <div className="card side-card"><p className="eyebrow">MEDIA PACKAGE</p><h3>Ready to download</h3><p>The source image is composed into the branded 4:5 template with the article title and topic heading.</p><div className="quick-links"><a href={post.graphicPath} download>Download finished graphic <span>↓</span></a><a href={post.externalUrl || post.sourceUrl} target="_blank" rel="noreferrer">Open source article <span>↗</span></a><a href={designUrls.canvaTemplate} target="_blank" rel="noreferrer">Open Canva template <span>↗</span></a></div></div>
+        <div className="card side-card"><p className="eyebrow">MEDIA PACKAGE</p><h3>Ready to download</h3><p>The source image is composed into the branded 4:5 template with the article title and topic heading.</p><div className="quick-links"><a href={graphicSrc} download>Download finished graphic <span>↓</span></a>{post.featuredImageUrl ? <a href={post.featuredImageUrl} target="_blank" rel="noreferrer">Open source image <span>↗</span></a> : null}<a href={post.externalUrl || post.sourceUrl} target="_blank" rel="noreferrer">Open source article <span>↗</span></a></div><CanvaHandoff graphicSrc={graphicSrc} topicHeading={post.topicHeading} articleTitle={post.articleTitle} /></div>
       </div>
     </div>
   </>;

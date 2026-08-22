@@ -62,6 +62,25 @@ which is local to your machine. Pass post ids to leave out:
 npm run graphics:record -- post_954d1aa7
 ```
 
+## Adjusting a graphic by hand
+
+The review page has an **Adjust graphic manually** panel: image zoom and
+position, where the fade starts, where the text starts, headline size, line
+spacing, and overlay strength. Sliders preview live through the graphic route's
+query string and persist on save; "Back to automatic" clears them.
+
+Manual settings beat anything inferred from the guidance text, including the
+framing chosen for a detected designed graphic. The knobs, their bounds, and
+their UI metadata live together in `src/design/graphic-adjustments.ts` so the
+renderer, the API validation, and the editor controls cannot drift apart — add
+new controls there.
+
+For the occasional graphic the composer cannot get right, **Edit in Canva** in
+the media package downloads the finished PNG and opens the brand template
+alongside it. That is a file handoff, not an API integration: there is no
+round-trip back into the review queue, and edits made in Canva are not reflected
+here.
+
 ## Framing
 
 Reviewer guidance (the "Copy + graphic improvement" box) is parsed by
