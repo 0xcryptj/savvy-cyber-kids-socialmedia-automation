@@ -10,7 +10,7 @@ export function finalizeGeneratedPost(input: GeneratedSocialPost) {
   return buildFinalPost(input);
 }
 
-const systemPrompt = `Create a warm, practical Savvy Cyber Kids social post for families. Preserve the article title exactly. Use plain text only: do not use emojis or decorative symbols. Return exactly two topical hashtags; do not include #savvycyberkids or #cyberhero. If reviewer guidance includes visual requests, translate them into a short actionable graphic_guidance instruction using only concepts such as zoom_out, contain_image, reduce_text, add_spacing, or safer_layout. Respond with JSON only matching this shape: {"topic_heading":"string","article_title":"string","caption":"string","hashtags":["#tag1","#tag2"],"graphic_guidance":"optional visual instruction"}.`;
+const systemPrompt = `Create a warm, practical Savvy Cyber Kids social post for families. Preserve the article title exactly. Use plain text only: do not use emojis or decorative symbols. Return exactly two topical hashtags; do not include #savvycyberkids or #cyberhero. When an article image is attached, inspect it before deciding graphic_guidance: identify the subject's focal area, whether the image is portrait or landscape, and where the composer can safely place copy. Never ask the image model to replace an available article image. Use short actionable guidance such as "center subject, keep top banner visible, place text over the darker lower area" or "crop to the upper subject and use a navy gradient behind the title". Respond with JSON only matching this shape: {"topic_heading":"string","article_title":"string","caption":"string","hashtags":["#tag1","#tag2"],"graphic_guidance":"optional visual instruction"}.`;
 
 async function apiKey(provider: "openai" | "anthropic" | "openai-compatible") {
   const stored = await getStoredCredential(provider);
@@ -34,7 +34,10 @@ async function generateWithProvider(article: SourceArticle, reviewerGuidance?: s
     response = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" }, body: JSON.stringify({ model: settings.model, max_tokens: 900, system: systemPrompt, messages: [{ role: "user", content: prompt }] }) });
   } else {
     const base = (settings.baseUrl || (settings.provider === "openai" ? "https://api.openai.com/v1" : "https://openrouter.ai/api/v1")).replace(/\/$/, "");
-    response = await fetch(`${base}/chat/completions`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${key}` }, body: JSON.stringify({ model: settings.model, temperature: 0.7, response_format: { type: "json_object" }, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: prompt }] }) });
+    const userContent = settings.provider === "openai" && article.featuredImageUrl
+      ? [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: article.featuredImageUrl } }]
+      : prompt;
+    response = await fetch(`${base}/chat/completions`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${key}` }, body: JSON.stringify({ model: settings.model, temperature: 0.7, response_format: { type: "json_object" }, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userContent }] }) });
   }
   if (!response.ok) throw new Error(`AI provider request failed (${response.status})`);
   const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }>; content?: Array<{ text?: string }> };

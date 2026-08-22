@@ -5,7 +5,7 @@ import { findSourceArticle, hydrateArticle } from "@/src/ingest/wordpress";
 import { SourceArticle } from "@/src/ingest/types";
 import { findPostByCanonicalUrl, savePost } from "@/src/workspace/store";
 import { WorkspacePost } from "@/src/workspace/types";
-import { generateOpenAIBackground } from "@/src/design/openai-image";
+import { articleImageAvailable, generateOpenAIBackground } from "@/src/design/openai-image";
 
 export async function processArticle(input: { canonicalUrl: string; category: ContentCategory; sourceArticle?: SourceArticle }): Promise<WorkspacePost> {
   const existing = await findPostByCanonicalUrl(input.canonicalUrl);
@@ -25,10 +25,12 @@ export async function processArticle(input: { canonicalUrl: string; category: Co
   const article = await hydrateArticle(found ?? selected!);
   const generated = finalizeGeneratedPost(await generateSocialPost(article));
   let generatedImageUrl: string | undefined;
-  try {
-    generatedImageUrl = await generateOpenAIBackground({ topicHeading: generated.topic_heading, articleTitle: generated.article_title, articleImage: article.featuredImageUrl });
-  } catch (error) {
-    console.warn("OpenAI graphic generation unavailable; using source image:", error instanceof Error ? error.message : "unknown error");
+  if (!(await articleImageAvailable(article.featuredImageUrl))) {
+    try {
+      generatedImageUrl = await generateOpenAIBackground({ topicHeading: generated.topic_heading, articleTitle: generated.article_title, articleImage: article.featuredImageUrl });
+    } catch (error) {
+      console.warn("OpenAI fallback graphic unavailable:", error instanceof Error ? error.message : "unknown error");
+    }
   }
   const id = `post_${randomUUID().slice(0, 8)}`;
 
@@ -45,7 +47,7 @@ export async function processArticle(input: { canonicalUrl: string; category: Co
     externalUrl: article.externalUrl,
     featuredImageUrl: article.featuredImageUrl,
     generatedImageUrl,
-    graphicGenerationStatus: generatedImageUrl ? "AI_GENERATED" : "SOURCE_FALLBACK",
+    graphicGenerationStatus: generatedImageUrl ? "AI_GENERATED" : article.featuredImageUrl ? "SOURCE_ARTICLE" : "SOURCE_FALLBACK",
     graphicPath: `/api/graphic/${id}`,
     publishedAt: article.publishedAt,
     createdAt: new Date().toISOString()

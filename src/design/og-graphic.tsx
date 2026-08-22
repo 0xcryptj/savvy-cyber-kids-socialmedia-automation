@@ -143,10 +143,10 @@ function graphicLayout(guidance?: string) {
   const text = guidance?.toLowerCase() || "";
   const saferLayout = /safer_layout|safe layout|avoid overlap|no overlap|fix cut|prevent cut|question[\s-]?mark|punctuation/.test(text);
   return {
-    imageFit: "contain" as const,
+    imageFit: "cover" as const,
     imagePosition: /top|banner|logo/.test(text) ? "center top" : "center center",
     titleWidth: saferLayout ? 780 : titleMaxWidth,
-    imageStageHeight: 760
+    imageStageHeight: canvaTemplate.height
   } as const;
 }
 
@@ -176,19 +176,15 @@ export async function renderTemplateGraphic(input: GraphicInput) {
           fontFamily: canvaTemplate.layout.fontFace
         }}
       >
-        {imageSource ? <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: layout.imageStageHeight, display: "flex", alignItems: "center", justifyContent: "center", background: canvaTemplate.colors.darkBlue, overflow: "hidden" }}>
-          <img src={imageSource} alt="" width={canvaTemplate.width} height={layout.imageStageHeight} style={{ position: "absolute", inset: -28, width: canvaTemplate.width + 56, height: layout.imageStageHeight + 56, objectFit: "cover", objectPosition: layout.imagePosition, opacity: 0.42 }} />
-          <img src={imageSource} alt="" width={canvaTemplate.width} height={layout.imageStageHeight} style={{ position: "relative", width: canvaTemplate.width, height: layout.imageStageHeight, objectFit: layout.imageFit, objectPosition: layout.imagePosition }} />
-          <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle at 50% 35%, rgba(0,174,239,0.12), rgba(0,27,45,0) 52%), linear-gradient(to bottom, rgba(0,27,45,0.04) 0%, rgba(0,27,45,0.12) 58%, rgba(0,0,0,0.68) 100%)" }} />
-        </div> : <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: canvaTemplate.colors.darkBlue, color: "rgba(255,255,255,0.82)", fontFamily: canvaTemplate.layout.fontFace, fontSize: 28, letterSpacing: 3 }}>IMAGE UNAVAILABLE</div>}
+        {imageSource ? <img src={imageSource} alt="" width={canvaTemplate.width} height={canvaTemplate.height} style={{ position: "absolute", inset: 0, width: canvaTemplate.width, height: canvaTemplate.height, objectFit: layout.imageFit, objectPosition: layout.imagePosition }} /> : <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: canvaTemplate.colors.darkBlue, color: "rgba(255,255,255,0.82)", fontFamily: canvaTemplate.layout.fontFace, fontSize: 28, letterSpacing: 3 }}>IMAGE UNAVAILABLE</div>}
         <div
           style={{
             position: "absolute",
             left: 0,
             right: 0,
             bottom: 0,
-            height: 760,
-            backgroundImage: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.12) 28%, rgba(0,0,0,0.38) 46%, rgba(0,0,0,0.78) 72%, rgba(0,0,0,0.96) 100%)"
+            height: 820,
+            backgroundImage: "linear-gradient(to bottom, rgba(16,44,74,0) 0%, rgba(16,44,74,0.04) 28%, rgba(8,29,49,0.34) 48%, rgba(5,19,34,0.88) 72%, rgba(0,10,20,0.98) 100%)"
           }}
         />
         <Logo src={logoData} />

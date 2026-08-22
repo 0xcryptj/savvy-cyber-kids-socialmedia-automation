@@ -4,6 +4,16 @@ import { DesignRenderer, RenderRequest, RenderedGraphic } from "./renderer";
 
 type ImageResponsePayload = { data?: Array<{ b64_json?: string; url?: string }> };
 
+export async function articleImageAvailable(imageUrl?: string): Promise<boolean> {
+  if (!imageUrl) return false;
+  try {
+    const response = await fetch(imageUrl.replaceAll("&amp;", "&"), { headers: { Accept: "image/*" }, redirect: "follow", signal: AbortSignal.timeout(8000) });
+    return response.ok && (response.headers.get("content-type") || "").startsWith("image/");
+  } catch {
+    return false;
+  }
+}
+
 async function imageApiKey() {
   const settings = await getAISettings();
   if (settings.provider !== "openai") throw new Error("OpenAI image generation requires the OpenAI provider");
