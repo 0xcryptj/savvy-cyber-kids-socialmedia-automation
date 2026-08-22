@@ -53,6 +53,8 @@ The installer stores the checkout under `~/.local/share/savvy-cyber-kids-socialm
 sck
 ```
 
+Use `sck -dev` to launch the `dev` branch for feature work and testing. It creates an isolated worktree beside the stable checkout on first use; the regular `sck` command continues to launch `main`.
+
 Once the page opens, go to **Settings** and enter the provider, model, endpoint if needed, and API key. You do not need to edit a secrets file for the normal setup.
 
 Leave the terminal running while you use the app. Stop the development server with `Ctrl+C`.
