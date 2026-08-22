@@ -142,11 +142,18 @@ function headingScale(heading: string) {
 function graphicLayout(guidance?: string) {
   const text = guidance?.toLowerCase() || "";
   const saferLayout = /safer_layout|safe layout|avoid overlap|no overlap|fix cut|prevent cut|question[\s-]?mark|punctuation/.test(text);
+  const softenBlack = /remove (the )?black|less black|no black|blend (the )?(black|dark)|soften (the )?(black|dark)|blend (the )?space/.test(text);
+  const sourceArtwork = /contain_image|contain image|keep (all )?(source )?text visible|source (text|banner)|existing (text|banner|logo)|banner|logo/.test(text);
   return {
     imageFit: /crop|fill|zoom in|close[- ]?up/.test(text) && !/contain|keep visible|no crop|full image|text|banner/.test(text) ? "cover" as const : "contain" as const,
-    imagePosition: /top|banner|logo/.test(text) ? "center top" : "center center",
+    imagePosition: /bottom/.test(text) ? "center bottom" : "center top",
     titleWidth: saferLayout ? 780 : titleMaxWidth,
-    imageStageHeight: canvaTemplate.height
+    imageStageHeight: canvaTemplate.height,
+    panelBackground: softenBlack
+      ? "linear-gradient(to bottom, rgba(5,19,34,0.14) 0%, rgba(5,19,34,0.34) 24%, rgba(5,19,34,0.72) 58%, rgba(0,10,20,0.9) 100%)"
+      : sourceArtwork
+        ? "linear-gradient(to bottom, rgba(5,19,34,0.62) 0%, rgba(5,19,34,0.86) 18%, rgba(5,19,34,0.96) 52%, rgba(0,10,20,0.99) 100%)"
+        : "linear-gradient(to bottom, rgba(5,19,34,0.78) 0%, rgba(5,19,34,0.9) 18%, rgba(5,19,34,0.96) 52%, rgba(0,10,20,0.99) 100%)"
   } as const;
 }
 
@@ -184,7 +191,7 @@ export async function renderTemplateGraphic(input: GraphicInput) {
             right: 0,
             bottom: 0,
             height: 820,
-            backgroundImage: "linear-gradient(to bottom, rgba(5,19,34,0.78) 0%, rgba(5,19,34,0.9) 18%, rgba(5,19,34,0.96) 52%, rgba(0,10,20,0.99) 100%)"
+            backgroundImage: layout.panelBackground
           }}
         />
         <Logo src={logoData} />
