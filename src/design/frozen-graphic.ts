@@ -21,8 +21,11 @@ export async function freezePostGraphic(post: WorkspacePost): Promise<string> {
   return `storage/generated/${filename}`;
 }
 
-export async function readFrozenGraphic(relativePath: string): Promise<Buffer> {
+export async function readFrozenGraphic(relativePath: string): Promise<Uint8Array<ArrayBuffer>> {
   const filename = path.basename(relativePath);
   if (relativePath !== `storage/generated/${filename}`) throw new Error("Invalid frozen graphic path");
-  return readFile(path.join(generatedDirectory, filename));
+  const file = await readFile(path.join(generatedDirectory, filename));
+  // A Node Buffer is not structurally a BodyInit/BlobPart, and a view onto its
+  // pooled backing store types as ArrayBufferLike. Copy into a plain array.
+  return Uint8Array.from(file);
 }

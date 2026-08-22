@@ -31,8 +31,14 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       imageUrl: post.generatedImageUrl || post.featuredImageUrl,
       graphicGuidance: post.graphicGuidance
     });
-  } catch {
-    // A bad third-party image must not take down the whole graphic route.
-    return renderTemplateGraphic({ topicHeading: post.topicHeading, articleTitle: post.articleTitle, imageUrl: post.featuredImageUrl, graphicGuidance: post.graphicGuidance });
+  } catch (error) {
+    console.warn(`Graphic render failed for ${id}; retrying without the source image:`, error instanceof Error ? error.message : error);
+  }
+  try {
+    // Retrying with the same image would just fail the same way, so drop the
+    // photo entirely: a branded text-only card beats a broken feed tile.
+    return await renderTemplateGraphic({ topicHeading: post.topicHeading, articleTitle: post.articleTitle, graphicGuidance: post.graphicGuidance });
+  } catch (error) {
+    return new NextResponse(`Graphic unavailable: ${error instanceof Error ? error.message : "render failed"}`, { status: 500 });
   }
 }

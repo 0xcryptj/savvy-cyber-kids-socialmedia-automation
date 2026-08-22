@@ -54,6 +54,22 @@ export async function getPost(id: string): Promise<WorkspacePost | undefined> {
   return post ? normalizePost(post) : undefined;
 }
 
+// Once a post is approved it has left the review stage and is on its way to
+// being published, so its source article should stop competing for attention in
+// the Library. Anything still in review stays visible.
+const pipelineStatuses = new Set<PostStatus>(["APPROVED", "QUEUED", "SCHEDULED", "PUBLISHED"]);
+
+export async function listPipelineSourceUrls(): Promise<string[]> {
+  const { posts } = await readState();
+  const urls = new Set<string>();
+  for (const post of posts) {
+    if (!pipelineStatuses.has(post.status)) continue;
+    if (post.sourceUrl) urls.add(post.sourceUrl);
+    if (post.externalUrl) urls.add(post.externalUrl);
+  }
+  return [...urls];
+}
+
 export async function findPostByCanonicalUrl(url: string): Promise<WorkspacePost | undefined> {
   const { posts } = await readState();
   return posts.find((post) => post.sourceUrl === url || post.externalUrl === url);

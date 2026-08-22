@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { feedConfig, ContentCategory } from "@/config/feeds";
 import { SourceArticle } from "@/src/ingest/types";
@@ -37,17 +37,33 @@ function ArticleCard({ article, onCreate, busy }: { article: SourceArticle; onCr
   );
 }
 
-export function LibraryClient({ blog, news, initialErrors = {} }: { blog: SourceArticle[]; news: SourceArticle[]; initialErrors?: Partial<Record<ContentCategory, string>> }) {
+function articleUrls(article: SourceArticle) {
+  return [article.canonicalUrl, article.externalUrl, article.sourceUrl].filter(Boolean) as string[];
+}
+
+export function LibraryClient({ blog, news, pipelineUrls = [], initialErrors = {} }: { blog: SourceArticle[]; news: SourceArticle[]; pipelineUrls?: string[]; initialErrors?: Partial<Record<ContentCategory, string>> }) {
   const router = useRouter();
   const [tab, setTab] = useState<ContentCategory>("blog");
   const [liveBlog, setLiveBlog] = useState(blog);
   const [liveNews, setLiveNews] = useState(news);
+  const [livePipelineUrls, setLivePipelineUrls] = useState(pipelineUrls);
+  const [showPipelined, setShowPipelined] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(Object.entries(initialErrors).map(([category, message]) => `${category}: ${message}`).join(" | ") || null);
-  const articles = tab === "blog" ? liveBlog : liveNews;
   const config = feedConfig[tab];
-  const counts = useMemo(() => ({ blog: liveBlog.length, news: liveNews.length }), [liveBlog, liveNews]);
+  // An approved post is already on its way to being published, so its source
+  // article is hidden here rather than inviting a duplicate.
+  const pipelineSet = useMemo(() => new Set(livePipelineUrls), [livePipelineUrls]);
+  const isPipelined = useCallback((article: SourceArticle) => articleUrls(article).some((url) => pipelineSet.has(url)), [pipelineSet]);
+  const available = useMemo(() => ({
+    blog: liveBlog.filter((article) => !isPipelined(article)),
+    news: liveNews.filter((article) => !isPipelined(article))
+  }), [liveBlog, liveNews, isPipelined]);
+  const allForTab = tab === "blog" ? liveBlog : liveNews;
+  const articles = showPipelined ? allForTab : available[tab];
+  const hiddenCount = allForTab.length - available[tab].length;
+  const counts = useMemo(() => ({ blog: available.blog.length, news: available.news.length }), [available]);
 
   async function refreshSources() {
     setSyncing(true); setError(null);
@@ -55,7 +71,7 @@ export function LibraryClient({ blog, news, initialErrors = {} }: { blog: Source
       const response = await fetch("/api/sources", { cache: "no-store" });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Could not sync sources");
-      setLiveBlog(payload.blog ?? []); setLiveNews(payload.news ?? []);
+      setLiveBlog(payload.blog ?? []); setLiveNews(payload.news ?? []); setLivePipelineUrls(payload.pipelineUrls ?? []);
       const sourceErrors = payload.errors ? Object.entries(payload.errors).map(([category, message]) => `${category}: ${message}`).join(" | ") : "";
       setError(sourceErrors || null);
     } catch (err) { setError(err instanceof Error ? err.message : "Could not sync sources"); }
@@ -96,6 +112,7 @@ export function LibraryClient({ blog, news, initialErrors = {} }: { blog: Source
         <button className={tab === "news" ? "active" : ""} onClick={() => setTab("news")}>News feed · {counts.news}</button>
       </div>
       {error ? <div className="card empty error-panel">{error}</div> : null}
+      {hiddenCount ? <p className="pipeline-note">{hiddenCount} approved {hiddenCount === 1 ? "article is" : "articles are"} already in the publishing queue. <button type="button" className="link-button" onClick={() => setShowPipelined((current) => !current)}>{showPipelined ? "Hide them" : "Show them"}</button></p> : null}
       <div className="source-grid">
         {articles.map((article) => (
           <ArticleCard key={article.id} article={article} onCreate={createPost} busy={busy} />

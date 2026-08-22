@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { contentCategories, ContentCategory } from "@/config/feeds";
 import { listSourceArticles } from "@/src/ingest/wordpress";
+import { listPipelineSourceUrls } from "@/src/workspace/store";
 
 export async function GET(request: NextRequest) {
   const category = request.nextUrl.searchParams.get("category") as ContentCategory | null;
@@ -12,9 +13,10 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const [blogResult, newsResult] = await Promise.allSettled([listSourceArticles("blog"), listSourceArticles("news")]);
+  const [blogResult, newsResult, pipelineResult] = await Promise.allSettled([listSourceArticles("blog"), listSourceArticles("news"), listPipelineSourceUrls()]);
   const errors: Partial<Record<ContentCategory, string>> = {};
   const blog = blogResult.status === "fulfilled" ? blogResult.value : (errors.blog = blogResult.reason instanceof Error ? blogResult.reason.message : "Could not load blog sources", []);
   const news = newsResult.status === "fulfilled" ? newsResult.value : (errors.news = newsResult.reason instanceof Error ? newsResult.reason.message : "Could not load news sources", []);
-  return NextResponse.json({ blog, news, errors }, { status: Object.keys(errors).length === 2 ? 502 : 200, headers: { "Cache-Control": "public, max-age=300, stale-while-revalidate=900" } });
+  const pipelineUrls = pipelineResult.status === "fulfilled" ? pipelineResult.value : [];
+  return NextResponse.json({ blog, news, pipelineUrls, errors }, { status: Object.keys(errors).length === 2 ? 502 : 200, headers: { "Cache-Control": "no-store" } });
 }

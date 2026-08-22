@@ -3,6 +3,7 @@ import { readFile } from "fs/promises";
 import path from "path";
 import { canvaTemplate } from "@/config/template";
 import { highlightedTitleParts } from "@/src/content/local-copy";
+import { GraphicIntent, parseGraphicIntent, defaultTitleWidth } from "./graphic-intent";
 
 type GraphicInput = {
   topicHeading: string;
@@ -29,7 +30,10 @@ async function resolveImageSource(imageUrl?: string) {
     if (!["http:", "https:"].includes(parsed.protocol) || /^(localhost|127\.|0\.0\.0\.0|::1|169\.254\.)/i.test(parsed.hostname)) return undefined;
     const response = await fetch(parsed, {
       headers: {
-        Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        // Satori decodes PNG, JPEG and GIF only. Advertising webp/avif here is
+        // what made news CDNs hand back a webp that the renderer then choked
+        // on ("u2 is not iterable"), taking the whole graphic route down.
+        Accept: "image/png,image/jpeg,image/gif;q=0.8,*/*;q=0.5",
         "User-Agent": "SavvyCyberKidsGraphicRenderer/1.0",
         Referer: `${parsed.origin}/`
       },
@@ -37,22 +41,42 @@ async function resolveImageSource(imageUrl?: string) {
       signal: AbortSignal.timeout(15000)
     });
     if (!response.ok) return undefined;
-    const mimeType = response.headers.get("content-type")?.split(";", 1)[0].toLowerCase() || "";
+    const headerMime = response.headers.get("content-type")?.split(";", 1)[0].toLowerCase() || "";
     const bytes = Buffer.from(await response.arrayBuffer());
-    const detectedMime = mimeType.startsWith("image/") ? mimeType : detectImageMime(bytes);
+    // Trust the bytes over the header: a wrong content-type is exactly how an
+    // undecodable image reaches Satori.
+    const detectedMime = detectImageMime(bytes) || (headerMime.startsWith("image/") ? headerMime : undefined);
     if (!detectedMime) return undefined;
-    return `data:${detectedMime};base64,${bytes.toString("base64")}`;
+    if (renderableMimes.has(detectedMime)) return `data:${detectedMime};base64,${bytes.toString("base64")}`;
+    const transcoded = await transcodeToPng(bytes);
+    return transcoded ? `data:image/png;base64,${transcoded.toString("base64")}` : undefined;
   } catch {
     return undefined;
   }
 }
+
+// Formats Satori can rasterise directly.
+const renderableMimes = new Set(["image/png", "image/jpeg", "image/gif"]);
 
 function detectImageMime(bytes: Buffer): string | undefined {
   if (bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return "image/png";
   if (bytes.length >= 3 && bytes.subarray(0, 3).equals(Buffer.from([255, 216, 255]))) return "image/jpeg";
   if (bytes.length >= 6 && ["GIF87a", "GIF89a"].includes(bytes.subarray(0, 6).toString("ascii"))) return "image/gif";
   if (bytes.length >= 12 && bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP") return "image/webp";
+  if (bytes.length >= 12 && bytes.subarray(4, 8).toString("ascii") === "ftyp" && /^(avif|avis|mif1|heic|heix|hevc)$/.test(bytes.subarray(8, 12).toString("ascii"))) return "image/avif";
   return undefined;
+}
+
+// Some hosts ignore the Accept header. sharp ships with Next's image
+// optimiser, so use it opportunistically; if it is unavailable the caller
+// falls back to rendering without a photo rather than throwing.
+async function transcodeToPng(bytes: Buffer): Promise<Buffer | undefined> {
+  try {
+    const sharp = (await import("sharp")).default;
+    return await sharp(bytes).png().toBuffer();
+  } catch {
+    return undefined;
+  }
 }
 
 function Logo({ src }: { src: string }) {
@@ -62,15 +86,26 @@ function Logo({ src }: { src: string }) {
 type TitleWord = { text: string; start: number; end: number };
 type TitleLine = { text: string; start: number; end: number };
 
-const titleMaxWidth = 820;
-// Keep every element inside a safe inset from the black panel. The panel starts
-// lower on the canvas so the source image remains the visual anchor.
-const blackBoxTop = 700;
-const blackBoxBottom = 1350;
-const blackBoxPaddingTop = 48;
-const blackBoxPaddingBottom = 64;
-const titleMaxHeight = blackBoxBottom - blackBoxTop - blackBoxPaddingTop - blackBoxPaddingBottom - 100;
-const titleAreaHeight = 430;
+// One source of truth for the lower-third composition. Every constant below is
+// derived from the canvas so the gradient, the text box, and the fitting loop
+// can never drift apart: a mismatch here is what let the overlay start 170px
+// above the text block and clip the last headline line.
+const canvasHeight = canvaTemplate.height;
+const sideInset = 56;
+// The scrim begins here fully transparent and only reaches full strength at the
+// very bottom. It must never start at a visible alpha or it reads as a box.
+const scrimTop = 560;
+const textTop = 900;
+const textBottomInset = 72;
+const headingFontMax = 36;
+const headingGap = 22;
+const dividerHeight = 3;
+const dividerGap = 26;
+const headingBlockHeight = headingFontMax + headingGap + dividerHeight + dividerGap;
+// The fitting loop and the rendered box share this number, so a headline that
+// "fits" is always a headline that is fully visible.
+const titleAreaHeight = canvasHeight - textBottomInset - textTop - headingBlockHeight;
+const titleMaxWidth = defaultTitleWidth;
 
 function estimatedWidth(text: string, fontSize: number) {
   let units = 0;
@@ -104,23 +139,23 @@ function wrapTitle(title: string, fontSize: number, maxWidth = titleMaxWidth): T
   return lines;
 }
 
-function titleFit(title: string, highlight: string, guidance?: string, maxWidth = titleMaxWidth) {
-  const normalizedTitle = title.trim().toUpperCase();
-  const highlightStart = normalizedTitle.indexOf(highlight.trim().toUpperCase());
-  const highlightEnd = highlightStart >= 0 ? highlightStart + highlight.trim().length : -1;
+function titleFit(title: string, highlight: string, intent: GraphicIntent, maxWidth = titleMaxWidth) {
+  // Collapse internal whitespace first: the highlight offsets and the line
+  // slices are both taken from this string, so normalising once keeps the
+  // coloured segment aligned and avoids double spaces at a segment boundary.
+  const normalizedTitle = title.trim().replace(/\s+/g, " ").toUpperCase();
+  const normalizedHighlight = highlight.trim().replace(/\s+/g, " ").toUpperCase();
+  const highlightStart = normalizedHighlight ? normalizedTitle.indexOf(normalizedHighlight) : -1;
+  const highlightEnd = highlightStart >= 0 ? highlightStart + normalizedHighlight.length : -1;
 
-  // Start large enough to use the available black-box area for short titles,
-  // then step down only when wrapping would exceed the real dimensions.
-  const guidanceText = guidance?.toLowerCase() || "";
-  const requestedScale = /smaller|reduce|less text|fit|overlap/.test(guidanceText) ? 0.88 : 1;
-  const lineSpacing = /spacing|space out|breathing room|separate/.test(guidanceText) ? 1.14 : 1.06;
-  for (let fontSize = Math.round(132 * requestedScale); fontSize >= 22; fontSize -= 2) {
+  const { titleScale: requestedScale, lineSpacing } = intent;
+  for (let fontSize = Math.round(132 * requestedScale); fontSize >= 24; fontSize -= 2) {
     const lineHeight = Math.round(fontSize * lineSpacing);
     const lines = wrapTitle(normalizedTitle, fontSize, maxWidth);
-    if (lines.length * lineHeight <= titleMaxHeight) return { fontSize, lineHeight, lines, highlightStart, highlightEnd };
+    if (lines.length * lineHeight <= titleAreaHeight) return { fontSize, lineHeight, lines, highlightStart, highlightEnd };
   }
 
-  const fontSize = 22;
+  const fontSize = 24;
   return { fontSize, lineHeight: Math.round(fontSize * lineSpacing), lines: wrapTitle(normalizedTitle, fontSize, maxWidth), highlightStart, highlightEnd };
 }
 
@@ -136,26 +171,16 @@ function lineSegments(line: TitleLine, highlightStart: number, highlightEnd: num
 }
 
 function headingScale(heading: string) {
-  return Math.max(20, Math.min(36, Math.round(900 / Math.max(heading.length, 12))));
+  return Math.max(24, Math.min(headingFontMax, Math.round(980 / Math.max(heading.length, 12))));
 }
 
-function graphicLayout(guidance?: string) {
-  const text = guidance?.toLowerCase() || "";
-  const saferLayout = /safer_layout|safe layout|avoid overlap|no overlap|fix cut|prevent cut|question[\s-]?mark|punctuation/.test(text);
-  const softenBlack = /remove (the )?black|less black|no black|blend (the )?(black|dark)|soften (the )?(black|dark)|blend (the )?space/.test(text);
-  const sourceArtwork = /contain_image|contain image|keep (all )?(source )?text visible|source (text|banner)|existing (text|banner|logo)|banner|logo/.test(text);
-  return {
-    imageFit: /crop|fill|zoom in|close[- ]?up/.test(text) && !/contain|keep visible|no crop|full image|text|banner/.test(text) ? "cover" as const : "contain" as const,
-    imagePosition: /bottom/.test(text) ? "center bottom" : "center top",
-    titleWidth: saferLayout ? 780 : titleMaxWidth,
-    imageStageHeight: canvaTemplate.height,
-    panelBackground: softenBlack
-      ? "linear-gradient(to bottom, rgba(5,19,34,0.14) 0%, rgba(5,19,34,0.34) 24%, rgba(5,19,34,0.72) 58%, rgba(0,10,20,0.9) 100%)"
-      : sourceArtwork
-        ? "linear-gradient(to bottom, rgba(5,19,34,0.62) 0%, rgba(5,19,34,0.86) 18%, rgba(5,19,34,0.96) 52%, rgba(0,10,20,0.99) 100%)"
-        : "linear-gradient(to bottom, rgba(5,19,34,0.78) 0%, rgba(5,19,34,0.9) 18%, rgba(5,19,34,0.96) 52%, rgba(0,10,20,0.99) 100%)"
-  } as const;
-}
+// Every ramp starts fully transparent. The variants change how fast the scrim
+// deepens, never whether it begins with a hard edge.
+const scrimRamps = {
+  light: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.06) 34%, rgba(0,0,0,0.26) 54%, rgba(3,14,26,0.62) 76%, rgba(3,14,26,0.86) 100%)",
+  default: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.12) 28%, rgba(0,0,0,0.38) 46%, rgba(0,0,0,0.78) 72%, rgba(0,0,0,0.96) 100%)",
+  heavy: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(5,19,34,0.24) 26%, rgba(5,19,34,0.58) 46%, rgba(5,19,34,0.9) 72%, rgba(3,14,26,0.98) 100%)"
+} as const;
 
 export async function renderTemplateGraphic(input: GraphicInput) {
   const [logoData, imageSource, regularFont, mediumFont, semiBoldFont, boldFont] = await Promise.all([
@@ -168,8 +193,11 @@ export async function renderTemplateGraphic(input: GraphicInput) {
   ]);
   const { highlight } = highlightedTitleParts(input.articleTitle);
   const heading = input.topicHeading.toUpperCase();
-  const layout = graphicLayout(input.graphicGuidance);
-  const scaledTitle = titleFit(input.articleTitle, highlight, input.graphicGuidance, layout.titleWidth);
+  const intent = parseGraphicIntent(input.graphicGuidance);
+  const scaledTitle = titleFit(input.articleTitle, highlight, intent, intent.titleWidth);
+  // A contained image leaves letterbox voids; a dimmed cover-scaled copy of
+  // the same photo fills them so the frame still reads as full-bleed.
+  const showBackdrop = intent.fit === "contain";
 
   return new ImageResponse(
     (
@@ -183,44 +211,54 @@ export async function renderTemplateGraphic(input: GraphicInput) {
           fontFamily: canvaTemplate.layout.fontFace
         }}
       >
-        {imageSource ? <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(145deg, #0b3558 0%, #123f63 52%, #061c31 100%)" }}><img src={imageSource} alt="" width={canvaTemplate.width} height={canvaTemplate.height} style={{ position: "relative", width: canvaTemplate.width, height: canvaTemplate.height, objectFit: layout.imageFit, objectPosition: layout.imagePosition }} /></div> : <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: canvaTemplate.colors.darkBlue, color: "rgba(255,255,255,0.82)", fontFamily: canvaTemplate.layout.fontFace, fontSize: 28, letterSpacing: 3 }}>IMAGE UNAVAILABLE</div>}
+        {imageSource ? (
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: canvaTemplate.colors.darkBlue }}>
+            {/* A contained image would otherwise sit in flat letterbox voids.
+                Filling them with a dimmed cover-scaled copy of the same photo
+                keeps the frame full-bleed while the artwork stays uncropped. */}
+            {showBackdrop ? <img src={imageSource} alt="" width={canvaTemplate.width} height={canvasHeight} style={{ position: "absolute", inset: 0, width: canvaTemplate.width, height: canvasHeight, objectFit: "cover", objectPosition: "center", opacity: 0.35 }} /> : null}
+            <img src={imageSource} alt="" width={canvaTemplate.width} height={canvasHeight} style={{ position: "relative", width: canvaTemplate.width, height: canvasHeight, objectFit: intent.fit, objectPosition: intent.focus }} />
+          </div>
+        ) : (
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: canvaTemplate.colors.darkBlue, color: "rgba(255,255,255,0.82)", fontFamily: canvaTemplate.layout.fontFace, fontSize: 28, letterSpacing: 3 }}>IMAGE UNAVAILABLE</div>
+        )}
         <div
           style={{
             position: "absolute",
             left: 0,
             right: 0,
+            top: scrimTop,
             bottom: 0,
-            height: 820,
-            backgroundImage: layout.panelBackground
+            backgroundImage: scrimRamps[intent.scrim]
           }}
         />
         <Logo src={logoData} />
         <div
           style={{
             position: "absolute",
-            left: 56,
-            right: 56,
-            top: blackBoxTop + blackBoxPaddingTop,
-            bottom: blackBoxPaddingBottom,
+            left: sideInset,
+            right: sideInset,
+            top: textTop,
+            bottom: textBottomInset,
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "flex-start"
           }}
         >
-          <div style={{ color: "rgba(255,255,255,0.96)", fontFamily: canvaTemplate.layout.fontFace, fontSize: headingScale(heading), fontWeight: canvaTemplate.fontWeights.bold, letterSpacing: 2.5, textAlign: "center", marginBottom: 22, padding: "0 20px", whiteSpace: "nowrap", overflow: "hidden", maxWidth: 980 }}>
+          <div style={{ color: "rgba(255,255,255,0.96)", fontFamily: canvaTemplate.layout.fontFace, fontSize: headingScale(heading), fontWeight: canvaTemplate.fontWeights.bold, letterSpacing: 2.5, textAlign: "center", marginBottom: headingGap, padding: "0 20px" }}>
             {heading}
           </div>
-          <div style={{ width: 860, height: 3, background: canvaTemplate.layout.dividerColor, marginBottom: 28 }} />
-          <div style={{ width: "100%", height: titleAreaHeight, display: "flex", flexDirection: "column", justifyContent: "center", textAlign: "center", fontFamily: canvaTemplate.layout.fontFace, fontSize: scaledTitle.fontSize, fontWeight: canvaTemplate.fontWeights.bold, lineHeight: `${scaledTitle.lineHeight}px`, textTransform: "uppercase", maxWidth: layout.titleWidth, padding: "0 12px", overflow: "hidden" }}>
-            {scaledTitle.lines.map((line) => <div key={`${line.start}-${line.end}`} style={{ display: "flex", justifyContent: "center", whiteSpace: "nowrap", overflow: "hidden", width: "100%" }}>{lineSegments(line, scaledTitle.highlightStart, scaledTitle.highlightEnd).map((segment, index) => <span key={`${line.start}-${index}`} style={{ color: segment.highlighted ? canvaTemplate.colors.lightBlue : canvaTemplate.colors.white, whiteSpace: "pre" }}>{segment.text}</span>)}</div>)}
+          <div style={{ width: 860, height: dividerHeight, background: canvaTemplate.layout.dividerColor, marginBottom: dividerGap }} />
+          <div style={{ width: "100%", height: titleAreaHeight, display: "flex", flexDirection: "column", justifyContent: "flex-start", textAlign: "center", fontFamily: canvaTemplate.layout.fontFace, fontSize: scaledTitle.fontSize, fontWeight: canvaTemplate.fontWeights.bold, lineHeight: `${scaledTitle.lineHeight}px`, textTransform: "uppercase", maxWidth: intent.titleWidth, padding: "0 12px" }}>
+            {scaledTitle.lines.map((line) => <div key={`${line.start}-${line.end}`} style={{ display: "flex", justifyContent: "center", width: "100%" }}>{lineSegments(line, scaledTitle.highlightStart, scaledTitle.highlightEnd).map((segment, index) => <span key={`${line.start}-${index}`} style={{ color: segment.highlighted ? canvaTemplate.colors.lightBlue : canvaTemplate.colors.white, whiteSpace: "pre-wrap" }}>{segment.text}</span>)}</div>)}
           </div>
         </div>
       </div>
     ),
     {
       width: canvaTemplate.width,
-      height: canvaTemplate.height,
+      height: canvasHeight,
       fonts: [
         { name: canvaTemplate.fonts.primary, data: regularFont, weight: canvaTemplate.fontWeights.regular },
         { name: canvaTemplate.fonts.primary, data: mediumFont, weight: canvaTemplate.fontWeights.medium },

@@ -39,7 +39,7 @@ async function uploadGraphic(post: WorkspacePost): Promise<PostizUpload> {
   const settings = await getPostizSettings();
   const graphic = post.frozenGraphicPath
     ? await readFrozenGraphic(post.frozenGraphicPath)
-    : Buffer.from(await (await renderTemplateGraphic({ topicHeading: post.topicHeading, articleTitle: post.articleTitle, imageUrl: post.generatedImageUrl || post.featuredImageUrl, graphicGuidance: post.graphicGuidance })).arrayBuffer());
+    : new Uint8Array(await (await renderTemplateGraphic({ topicHeading: post.topicHeading, articleTitle: post.articleTitle, imageUrl: post.generatedImageUrl || post.featuredImageUrl, graphicGuidance: post.graphicGuidance })).arrayBuffer());
   const form = new FormData();
   form.append("file", new Blob([graphic], { type: "image/png" }), `${post.id}.png`);
   const uploaded = await fetch(`${settings.apiUrl}/upload`, { method: "POST", headers: { Authorization: settings.apiKey }, body: form, signal: AbortSignal.timeout(30_000) });
