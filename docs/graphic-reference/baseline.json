@@ -11,6 +11,58 @@
   ],
   "entries": [
     {
+      "id": "post_c4245e67",
+      "category": "blog",
+      "reference": "post_c4245e67.jpg",
+      "input": {
+        "topicHeading": "Helping Friends Without Risking Your Grades",
+        "articleTitle": "Think Before You Share: How to Help Friends Without Giving Away Your Homework",
+        "imageUrl": "https://savvycyberkids.org/wp-content/uploads/2026/01/blog-think-before-you-share.jpg",
+        "graphicGuidance": "make the black gradients slightly more visable  Ensure the lower third is clear for text placement."
+      }
+    },
+    {
+      "id": "post_42f9e64e",
+      "category": "blog",
+      "reference": "post_42f9e64e.jpg",
+      "input": {
+        "topicHeading": "Phishing Awareness",
+        "articleTitle": "Think Before You Tap: The Hidden Danger of Random Links",
+        "imageUrl": "https://savvycyberkids.org/wp-content/uploads/2026/01/blog-think-before-you-tap.jpg",
+        "graphicGuidance": "zoom the image out just a tad  zoom the image out just a tad"
+      }
+    },
+    {
+      "id": "post_f270faa2",
+      "category": "news",
+      "reference": "post_f270faa2.jpg",
+      "input": {
+        "topicHeading": "Understanding AI's Impact on Mental Health",
+        "articleTitle": "AI, Suicide, and the Wrong End of the Tunnel",
+        "imageUrl": "https://cdn2.psychologytoday.com/assets/styles/manual_crop_1_91_1_1528x800/public/teaser_image/blog_entry/2026-08/pexels-cottonbro-6153354.jpg?h=ccb56672&amp;itok=Wo0ki3_a"
+      }
+    },
+    {
+      "id": "post_0091a676",
+      "category": "news",
+      "reference": "post_0091a676.jpg",
+      "input": {
+        "topicHeading": "Gen Alpha Brand Preferences",
+        "articleTitle": "Amazon, Nike reign supreme with Gen Alpha teens: report",
+        "imageUrl": "https://imgproxy.divecdn.com/A_ED9Y3EPS-fqRyiHkXfYBSIpp1xY_oaxZn7OYC8DP0/g:ce/rs:fit:770:435/Z3M6Ly9kaXZlc2l0ZS1zdG9yYWdlL2RpdmVpbWFnZS9HZXR0eUltYWdlcy0xODAzOTMxMTkxXzEuanBn.webp"
+      }
+    },
+    {
+      "id": "post_09578d79",
+      "category": "blog",
+      "reference": "post_09578d79.jpg",
+      "input": {
+        "topicHeading": "Using AI Responsibly in Education",
+        "articleTitle": "From Flash Cards to Essays: How to Use AI Without Cheating",
+        "imageUrl": "https://savvycyberkids.org/wp-content/uploads/2026/01/blog-how-to-use-AI-without-cheating.jpg"
+      }
+    },
+    {
       "id": "post_3a1a1403",
       "category": "blog",
       "reference": "post_3a1a1403.jpg",
@@ -110,26 +162,6 @@
         "topicHeading": "Digital Citizenship",
         "articleTitle": "The Digital Leftovers We Leave Behind",
         "imageUrl": "https://savvycyberkids.org/wp-content/uploads/2026/06/blog-digital-leftovers.jpg"
-      }
-    },
-    {
-      "id": "post_479b36ce",
-      "category": "blog",
-      "reference": "post_479b36ce.jpg",
-      "input": {
-        "topicHeading": "Helping Each Other Without Risking Grades",
-        "articleTitle": "Think Before You Share: How to Help Friends Without Giving Away Your Homework",
-        "imageUrl": "https://savvycyberkids.org/wp-content/uploads/2026/01/blog-think-before-you-share.jpg"
-      }
-    },
-    {
-      "id": "post_55ab6687",
-      "category": "blog",
-      "reference": "post_55ab6687.jpg",
-      "input": {
-        "topicHeading": "Cyber Safety Tips for Families",
-        "articleTitle": "Think Before You Tap: The Hidden Danger of Random Links",
-        "imageUrl": "https://savvycyberkids.org/wp-content/uploads/2026/01/blog-think-before-you-tap.jpg"
       }
     }
   ]

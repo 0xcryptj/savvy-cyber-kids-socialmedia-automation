@@ -69,6 +69,20 @@ Reviewer guidance (the "Copy + graphic improvement" box) is parsed by
 If a phrasing is being ignored, add it there with a test rather than adding a
 regex to the renderer.
 
+Framing is graded, not a switch. `GraphicIntent.zoom` runs 0 to 1: 1 crops to
+the full frame (the default), 0 shows the whole source, and hedged wording
+("zoom out **a tad**", "zoom it out **a little**") lands at `partialZoom` in
+between. Satori's `objectFit` is all-or-nothing, so a partial crop is baked into
+the pixels with sharp before rendering — see `cropRectForZoom`.
+
+That middle setting exists because contained wide images look weak: The Verge's
+Roblox banner is 1200x624 and fills only 42% of the canvas height when shown
+whole. Partially cropped it fills about 61% and the logo still survives.
+
+A partially cropped image is anchored to the top edge, so its only visible
+transition is the bottom one, where the scrim already fades the photo into the
+headline.
+
 The full frame is shown instead of cropped when the reviewer asks for it, or
 when the vision model sets `source_image_has_text` — a designed graphic such as
 a news banner or title card, whose own words would be destroyed by the default

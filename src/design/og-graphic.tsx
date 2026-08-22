@@ -23,7 +23,7 @@ async function loadFont(name: string) {
   return font.buffer.slice(font.byteOffset, font.byteOffset + font.byteLength);
 }
 
-async function resolveImageSource(imageUrl?: string) {
+async function resolveImageSource(imageUrl: string | undefined, zoom: number) {
   if (!imageUrl) return undefined;
   try {
     const parsed = new URL(imageUrl.replaceAll("&amp;", "&"));
@@ -48,9 +48,13 @@ async function resolveImageSource(imageUrl?: string) {
     // undecodable image reaches Satori.
     const detectedMime = detectImageMime(bytes) || (headerMime.startsWith("image/") ? headerMime : undefined);
     if (!detectedMime) return undefined;
-    if (renderableMimes.has(detectedMime)) return `data:${detectedMime};base64,${bytes.toString("base64")}`;
-    const transcoded = await transcodeToPng(bytes);
-    return transcoded ? `data:image/png;base64,${transcoded.toString("base64")}` : undefined;
+    const usable = renderableMimes.has(detectedMime) ? { bytes, mime: detectedMime } : await transcodeToPng(bytes);
+    if (!usable) return undefined;
+    // A full-frame crop is what objectFit:"cover" already does, so leave the
+    // default path untouched and only reach for sharp when a partial crop is
+    // actually requested.
+    const framed = zoom >= 1 ? usable : await cropTowardFrame(usable, zoom);
+    return `data:${framed.mime};base64,${framed.bytes.toString("base64")}`;
   } catch {
     return undefined;
   }
@@ -68,15 +72,52 @@ function detectImageMime(bytes: Buffer): string | undefined {
   return undefined;
 }
 
-// Some hosts ignore the Accept header. sharp ships with Next's image
-// optimiser, so use it opportunistically; if it is unavailable the caller
-// falls back to rendering without a photo rather than throwing.
-async function transcodeToPng(bytes: Buffer): Promise<Buffer | undefined> {
+type UsableImage = { bytes: Buffer; mime: string };
+
+// Some hosts ignore the Accept header and return a format Satori cannot read.
+async function transcodeToPng(bytes: Buffer): Promise<UsableImage | undefined> {
   try {
     const sharp = (await import("sharp")).default;
-    return await sharp(bytes).png().toBuffer();
+    return { bytes: await sharp(bytes).png().toBuffer(), mime: "image/png" };
   } catch {
     return undefined;
+  }
+}
+
+const frameRatio = canvaTemplate.width / canvaTemplate.height;
+
+/**
+ * The largest centred crop whose aspect ratio sits `zoom` of the way from the
+ * source's own ratio toward the 4:5 frame. Satori's objectFit is all-or-nothing,
+ * so a partial crop has to be baked into the pixels before rendering.
+ *
+ * At zoom 1 the result is exactly the frame ratio (a full-bleed crop); at zoom 0
+ * the source is returned untouched.
+ */
+export function cropRectForZoom(width: number, height: number, zoom: number) {
+  const sourceRatio = width / height;
+  const targetRatio = sourceRatio + zoom * (frameRatio - sourceRatio);
+  const cropWidth = sourceRatio > targetRatio ? Math.round(height * targetRatio) : width;
+  const cropHeight = sourceRatio > targetRatio ? height : Math.round(width / targetRatio);
+  return {
+    width: Math.max(1, Math.min(width, cropWidth)),
+    height: Math.max(1, Math.min(height, cropHeight)),
+    left: Math.max(0, Math.round((width - Math.min(width, cropWidth)) / 2)),
+    top: Math.max(0, Math.round((height - Math.min(height, cropHeight)) / 2))
+  };
+}
+
+async function cropTowardFrame(image: UsableImage, zoom: number): Promise<UsableImage> {
+  try {
+    const sharp = (await import("sharp")).default;
+    const { width, height } = await sharp(image.bytes).metadata();
+    if (!width || !height) return image;
+    const rect = cropRectForZoom(width, height, zoom);
+    if (rect.width === width && rect.height === height) return image;
+    return { bytes: await sharp(image.bytes).extract(rect).png().toBuffer(), mime: "image/png" };
+  } catch {
+    // Without sharp the caller still renders, just with the untouched source.
+    return image;
   }
 }
 
@@ -191,9 +232,10 @@ const scrimRamps = {
 } as const;
 
 export async function renderTemplateGraphic(input: GraphicInput) {
+  const intent = parseGraphicIntent(input.graphicGuidance, input.sourceImageHasText);
   const [logoData, imageSource, regularFont, mediumFont, semiBoldFont, boldFont] = await Promise.all([
     loadLogo(),
-    resolveImageSource(input.imageUrl),
+    resolveImageSource(input.imageUrl, intent.zoom),
     loadFont("Asap-Regular.ttf"),
     loadFont("Asap-Medium.ttf"),
     loadFont("Asap-SemiBold.ttf"),
@@ -201,7 +243,6 @@ export async function renderTemplateGraphic(input: GraphicInput) {
   ]);
   const { highlight } = highlightedTitleParts(input.articleTitle);
   const heading = input.topicHeading.toUpperCase();
-  const intent = parseGraphicIntent(input.graphicGuidance, input.sourceImageHasText);
   const scaledTitle = titleFit(input.articleTitle, highlight, intent, intent.titleWidth);
 
   return new ImageResponse(
