@@ -141,13 +141,12 @@ function headingScale(heading: string) {
 
 function graphicLayout(guidance?: string) {
   const text = guidance?.toLowerCase() || "";
-  const zoomOut = /zoom[\s-]*out|show more|less crop|less cropped|full image|contain_image/.test(text);
   const saferLayout = /safer_layout|safe layout|avoid overlap|no overlap|fix cut|prevent cut|question[\s-]?mark|punctuation/.test(text);
   return {
-    imageFit: zoomOut ? "contain" : "cover",
-    imagePosition: zoomOut ? "center center" : "center 24%",
+    imageFit: "contain" as const,
+    imagePosition: /top|banner|logo/.test(text) ? "center top" : "center center",
     titleWidth: saferLayout ? 780 : titleMaxWidth,
-    imageStageHeight: zoomOut ? 760 : canvaTemplate.height
+    imageStageHeight: 760
   } as const;
 }
 
@@ -178,9 +177,9 @@ export async function renderTemplateGraphic(input: GraphicInput) {
         }}
       >
         {imageSource ? <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: layout.imageStageHeight, display: "flex", alignItems: "center", justifyContent: "center", background: canvaTemplate.colors.darkBlue, overflow: "hidden" }}>
-          {layout.imageFit === "contain" ? <img src={imageSource} alt="" width={canvaTemplate.width} height={layout.imageStageHeight} style={{ position: "absolute", inset: -28, width: canvaTemplate.width + 56, height: layout.imageStageHeight + 56, objectFit: "cover", objectPosition: layout.imagePosition, opacity: 0.42 }} /> : null}
+          <img src={imageSource} alt="" width={canvaTemplate.width} height={layout.imageStageHeight} style={{ position: "absolute", inset: -28, width: canvaTemplate.width + 56, height: layout.imageStageHeight + 56, objectFit: "cover", objectPosition: layout.imagePosition, opacity: 0.42 }} />
           <img src={imageSource} alt="" width={canvaTemplate.width} height={layout.imageStageHeight} style={{ position: "relative", width: canvaTemplate.width, height: layout.imageStageHeight, objectFit: layout.imageFit, objectPosition: layout.imagePosition }} />
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,27,45,0.04) 0%, rgba(0,27,45,0.08) 58%, rgba(0,0,0,0.62) 100%)" }} />
+          <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle at 50% 35%, rgba(0,174,239,0.12), rgba(0,27,45,0) 52%), linear-gradient(to bottom, rgba(0,27,45,0.04) 0%, rgba(0,27,45,0.12) 58%, rgba(0,0,0,0.68) 100%)" }} />
         </div> : <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: canvaTemplate.colors.darkBlue, color: "rgba(255,255,255,0.82)", fontFamily: canvaTemplate.layout.fontFace, fontSize: 28, letterSpacing: 3 }}>IMAGE UNAVAILABLE</div>}
         <div
           style={{
