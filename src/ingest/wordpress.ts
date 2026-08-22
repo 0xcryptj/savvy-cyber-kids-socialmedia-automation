@@ -73,7 +73,7 @@ export async function listSourceArticles(category: ContentCategory): Promise<Sou
     const items = await discoverFeedItems(rssUrl);
     if (items.length) return items.slice(0, perPage).map((item, index) => ({
       id: `${category}_rss_${index}_${Buffer.from(item.link).toString("base64url").slice(0, 10)}`,
-      category, sourceType: "rss" as const, sourceUrl: item.link, canonicalUrl: item.link,
+      category, sourceType: "rss" as const, sourceUrl: item.link, canonicalUrl: item.link, externalUrl: category === "news" ? item.link : undefined,
       title: item.title, excerpt: firstSentences(item.body) || item.title, body: htmlToText(item.body),
       featuredImageUrl: item.imageUrl, tags: [], publishedAt: item.publishedAt || new Date().toISOString()
     }));
@@ -103,7 +103,7 @@ export async function hydrateArticle(article: SourceArticle): Promise<SourceArti
     const description = og.description ? decodeHtml(htmlToText(og.description)) : article.excerpt;
     return {
       ...article,
-      featuredImageUrl: article.featuredImageUrl ?? (og.imageUrl ? new URL(og.imageUrl, article.externalUrl).toString() : undefined),
+      featuredImageUrl: og.imageUrl ? new URL(og.imageUrl, article.externalUrl).toString() : article.featuredImageUrl,
       excerpt: description,
       body: description
     };

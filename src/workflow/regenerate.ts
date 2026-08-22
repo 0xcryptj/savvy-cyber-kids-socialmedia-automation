@@ -54,6 +54,7 @@ export async function regeneratePost(id: string, reviewerGuidance?: string): Pro
     externalUrl: article.externalUrl,
     featuredImageUrl: article.featuredImageUrl,
     graphicPath: `/api/graphic/${nextId}`,
+    graphicGuidance: boundedText(reviewerGuidance, 1000) || undefined,
     usedFallbackSource,
     createdAt: new Date().toISOString(),
     approvedAt: undefined,

@@ -10,12 +10,18 @@ function formatDate(value: string) {
   return new Date(value).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 }
 
+function SourceThumb({ article }: { article: SourceArticle }) {
+  const [failed, setFailed] = useState(false);
+  return <div className="source-thumb">
+    {article.featuredImageUrl && !failed ? <img src={article.featuredImageUrl} alt="" onError={() => setFailed(true)} /> : <div className="source-thumb-fallback">{article.category === "news" ? "NEWS" : "SCK"}</div>}
+    <span className="source-badge">{article.category === "blog" ? "Blog" : "News"}</span>
+  </div>;
+}
+
 function ArticleCard({ article, onCreate, busy }: { article: SourceArticle; onCreate: (article: SourceArticle) => void; busy: string | null }) {
   return (
     <article className="card source-card">
-      <div className="source-thumb" style={article.featuredImageUrl ? { backgroundImage: `url(${article.featuredImageUrl})` } : undefined}>
-        <span className="source-badge">{article.category === "blog" ? "Blog" : "News"}</span>
-      </div>
+      <SourceThumb article={article} />
       <div className="source-copy">
         <p className="meta">{formatDate(article.publishedAt)}</p>
         <h3>{article.title}</h3>

@@ -8,6 +8,7 @@ type GraphicInput = {
   topicHeading: string;
   articleTitle: string;
   imageUrl?: string;
+  graphicGuidance?: string;
 };
 
 async function loadLogo() {
@@ -36,14 +37,22 @@ async function resolveImageSource(imageUrl?: string) {
       signal: AbortSignal.timeout(15000)
     });
     if (!response.ok) return undefined;
-    const mimeType = response.headers.get("content-type")?.split(";", 1)[0].toLowerCase() || "image/jpeg";
-    const data = Buffer.from(await response.arrayBuffer()).toString("base64");
-    const extensionLooksLikeImage = /\.(avif|gif|jpe?g|png|svg|webp)(?:$|[?#])/i.test(parsed.pathname) || /\.(avif|gif|jpe?g|png|svg|webp)(?:$|[?#])/i.test(new URL(response.url).pathname);
-    if (!mimeType.startsWith("image/") && !extensionLooksLikeImage) return undefined;
-    return `data:${mimeType.startsWith("image/") ? mimeType : "image/jpeg"};base64,${data}`;
+    const mimeType = response.headers.get("content-type")?.split(";", 1)[0].toLowerCase() || "";
+    const bytes = Buffer.from(await response.arrayBuffer());
+    const detectedMime = mimeType.startsWith("image/") ? mimeType : detectImageMime(bytes);
+    if (!detectedMime) return undefined;
+    return `data:${detectedMime};base64,${bytes.toString("base64")}`;
   } catch {
     return undefined;
   }
+}
+
+function detectImageMime(bytes: Buffer): string | undefined {
+  if (bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return "image/png";
+  if (bytes.length >= 3 && bytes.subarray(0, 3).equals(Buffer.from([255, 216, 255]))) return "image/jpeg";
+  if (bytes.length >= 6 && ["GIF87a", "GIF89a"].includes(bytes.subarray(0, 6).toString("ascii"))) return "image/gif";
+  if (bytes.length >= 12 && bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP") return "image/webp";
+  return undefined;
 }
 
 function Logo({ src }: { src: string }) {
@@ -94,21 +103,24 @@ function wrapTitle(title: string, fontSize: number): TitleLine[] {
   return lines;
 }
 
-function titleFit(title: string, highlight: string) {
+function titleFit(title: string, highlight: string, guidance?: string) {
   const normalizedTitle = title.trim().toUpperCase();
   const highlightStart = normalizedTitle.indexOf(highlight.trim().toUpperCase());
   const highlightEnd = highlightStart >= 0 ? highlightStart + highlight.trim().length : -1;
 
   // Start large enough to use the available black-box area for short titles,
   // then step down only when wrapping would exceed the real dimensions.
-  for (let fontSize = 132; fontSize >= 28; fontSize -= 2) {
-    const lineHeight = Math.round(fontSize * 1.06);
+  const guidanceText = guidance?.toLowerCase() || "";
+  const requestedScale = /smaller|reduce|less text|fit|overlap/.test(guidanceText) ? 0.88 : 1;
+  const lineSpacing = /spacing|space out|breathing room|separate/.test(guidanceText) ? 1.14 : 1.06;
+  for (let fontSize = Math.round(132 * requestedScale); fontSize >= 22; fontSize -= 2) {
+    const lineHeight = Math.round(fontSize * lineSpacing);
     const lines = wrapTitle(normalizedTitle, fontSize);
     if (lines.length * lineHeight <= titleMaxHeight) return { fontSize, lineHeight, lines, highlightStart, highlightEnd };
   }
 
-  const fontSize = 28;
-  return { fontSize, lineHeight: Math.round(fontSize * 1.06), lines: wrapTitle(normalizedTitle, fontSize), highlightStart, highlightEnd };
+  const fontSize = 22;
+  return { fontSize, lineHeight: Math.round(fontSize * lineSpacing), lines: wrapTitle(normalizedTitle, fontSize), highlightStart, highlightEnd };
 }
 
 function lineSegments(line: TitleLine, highlightStart: number, highlightEnd: number) {
@@ -137,7 +149,7 @@ export async function renderTemplateGraphic(input: GraphicInput) {
   ]);
   const { highlight } = highlightedTitleParts(input.articleTitle);
   const heading = input.topicHeading.toUpperCase();
-  const scaledTitle = titleFit(input.articleTitle, highlight);
+  const scaledTitle = titleFit(input.articleTitle, highlight, input.graphicGuidance);
 
   return new ImageResponse(
     (
@@ -176,12 +188,12 @@ export async function renderTemplateGraphic(input: GraphicInput) {
             justifyContent: "flex-start"
           }}
         >
-          <div style={{ color: "rgba(255,255,255,0.96)", fontFamily: canvaTemplate.layout.fontFace, fontSize: headingScale(heading), fontWeight: canvaTemplate.fontWeights.bold, letterSpacing: 2.5, textAlign: "center", marginBottom: 22, padding: "0 20px" }}>
+          <div style={{ color: "rgba(255,255,255,0.96)", fontFamily: canvaTemplate.layout.fontFace, fontSize: headingScale(heading), fontWeight: canvaTemplate.fontWeights.bold, letterSpacing: 2.5, textAlign: "center", marginBottom: 22, padding: "0 20px", whiteSpace: "nowrap", overflow: "hidden", maxWidth: 980 }}>
             {heading}
           </div>
           <div style={{ width: 860, height: 3, background: canvaTemplate.layout.dividerColor, marginBottom: 28 }} />
-          <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-start", textAlign: "center", fontFamily: canvaTemplate.layout.fontFace, fontSize: scaledTitle.fontSize, fontWeight: canvaTemplate.fontWeights.bold, lineHeight: `${scaledTitle.lineHeight}px`, textTransform: "uppercase", maxWidth: titleMaxWidth, padding: "0 12px" }}>
-            {scaledTitle.lines.map((line) => <div key={`${line.start}-${line.end}`} style={{ display: "flex", justifyContent: "center" }}>{lineSegments(line, scaledTitle.highlightStart, scaledTitle.highlightEnd).map((segment, index) => <span key={`${line.start}-${index}`} style={{ color: segment.highlighted ? canvaTemplate.colors.lightBlue : canvaTemplate.colors.white }}>{segment.text}</span>)}</div>)}
+          <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-start", textAlign: "center", fontFamily: canvaTemplate.layout.fontFace, fontSize: scaledTitle.fontSize, fontWeight: canvaTemplate.fontWeights.bold, lineHeight: `${scaledTitle.lineHeight}px`, textTransform: "uppercase", maxWidth: titleMaxWidth, padding: "0 12px", overflow: "hidden" }}>
+            {scaledTitle.lines.map((line) => <div key={`${line.start}-${line.end}`} style={{ display: "flex", justifyContent: "center", whiteSpace: "nowrap", overflow: "hidden", width: "100%" }}>{lineSegments(line, scaledTitle.highlightStart, scaledTitle.highlightEnd).map((segment, index) => <span key={`${line.start}-${index}`} style={{ color: segment.highlighted ? canvaTemplate.colors.lightBlue : canvaTemplate.colors.white, whiteSpace: "pre" }}>{segment.text}</span>)}</div>)}
           </div>
         </div>
       </div>

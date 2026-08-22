@@ -14,6 +14,7 @@ export type WorkspacePost = {
   externalUrl?: string;
   featuredImageUrl?: string;
   generatedImageUrl?: string;
+  graphicGuidance?: string;
   graphicPath: string;
   publishedAt: string;
   createdAt: string;

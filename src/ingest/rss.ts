@@ -23,7 +23,7 @@ function itemImageUrl(item: string): string | undefined {
   return attributeValue(item, "enclosure", "url")
     ?? attributeValue(item, "media:content", "url")
     ?? attributeValue(item, "media:thumbnail", "url")
-    ?? item.match(/<img\\b[^>]*\\bsrc=["']([^"']+)["']/i)?.[1];
+    ?? item.match(/<img\b[^>]*\bsrc=["']([^"']+)["']/i)?.[1];
 }
 
 export function parseRssItems(xml: string): RssItem[] {
@@ -41,6 +41,15 @@ export async function discoverFeedItems(feedUrl: string = feedConfig.blog.rssUrl
   const xml = await fetchText(feedUrl, 900);
   return parseRssItems(xml).map((item) => ({
     ...item,
-    imageUrl: item.imageUrl ? new URL(item.imageUrl, feedUrl).toString() : undefined
+    imageUrl: item.imageUrl ? safeAbsoluteUrl(item.imageUrl, feedUrl) : undefined
   }));
+}
+
+function safeAbsoluteUrl(value: string, base: string): string | undefined {
+  try {
+    const url = new URL(value, base);
+    return ["http:", "https:"].includes(url.protocol) ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
 }
