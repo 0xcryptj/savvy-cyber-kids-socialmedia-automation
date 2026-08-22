@@ -10,7 +10,7 @@ export const articles = sqliteTable("articles", {
 
 export const posts = sqliteTable("posts", {
   id: text("id").primaryKey(), articleId: text("article_id").notNull().references(() => articles.id), topicHeading: text("topic_heading").notNull(),
-  caption: text("caption").notNull(), status: text("status").notNull(), graphicPath: text("graphic_path"), canvaDesignId: text("canva_design_id"), socialBeeId: text("socialbee_id"),
+  caption: text("caption").notNull(), status: text("status").notNull(), graphicPath: text("graphic_path"), canvaDesignId: text("canva_design_id"), postizPostId: text("postiz_post_id"),
   createdAt: timestamps.createdAt, approvedAt: integer("approved_at", { mode: "timestamp_ms" }), queuedAt: integer("queued_at", { mode: "timestamp_ms" }), scheduledAt: integer("scheduled_at", { mode: "timestamp_ms" }), publishedAt: integer("published_at", { mode: "timestamp_ms" })
 });
 

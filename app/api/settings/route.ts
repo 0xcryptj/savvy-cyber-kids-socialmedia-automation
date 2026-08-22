@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAISettings, providerHasCredential, saveAISettings, AIProvider } from "@/src/config/ai-settings";
 import { saveStoredCredential } from "@/src/config/credentials";
 import { sameOrigin } from "@/src/lib/request-security";
-import { getEffectiveHandoffSettings, isValidHandoffUrl, safeHandoffSettings, saveHandoffSettings, saveHandoffTest } from "@/src/config/handoff-settings";
+import { getPostizSettings, safePostizSettings, savePostizSettings, PostizTest } from "@/src/config/postiz-settings";
+import { saveStoredPostizCredential } from "@/src/config/credentials";
+import { testPostizConnection } from "@/src/integrations/postiz";
 
 export async function GET() {
   const settings = await getAISettings();
-  const handoff = await getEffectiveHandoffSettings();
-  return NextResponse.json({ ...settings, configured: await providerHasCredential(settings.provider), handoff: safeHandoffSettings(handoff), providers: [
+  const postiz = await getPostizSettings();
+  return NextResponse.json({ ...settings, configured: await providerHasCredential(settings.provider), postiz: safePostizSettings(postiz), providers: [
     { id: "openai", label: "OpenAI", hint: "GPT-4o and GPT-4o mini" },
     { id: "anthropic", label: "Anthropic", hint: "Claude Sonnet and Claude Haiku" },
     { id: "openai-compatible", label: "OpenAI-compatible", hint: "OpenRouter, Groq, Together, Ollama, or your own endpoint" }
@@ -17,36 +19,29 @@ export async function GET() {
 export async function PATCH(request: NextRequest) {
   const originError = sameOrigin(request);
   if (originError) return originError;
-  const body = await request.json() as { provider?: AIProvider; model?: string; baseUrl?: string; apiKey?: string; makeWebhookUrl?: string; appPublicUrl?: string };
+  const body = await request.json() as { provider?: AIProvider; model?: string; baseUrl?: string; apiKey?: string; postizApiKey?: string; postizApiUrl?: string };
   if (body.provider && !["openai", "anthropic", "openai-compatible"].includes(body.provider)) return NextResponse.json({ error: "Unsupported AI provider" }, { status: 400 });
-  if (body.makeWebhookUrl?.trim() && !isValidHandoffUrl(body.makeWebhookUrl, "webhook")) return NextResponse.json({ error: "Make.com Webhook URL must use HTTPS (HTTP is allowed only for localhost)" }, { status: 400 });
-  if (body.appPublicUrl?.trim() && !isValidHandoffUrl(body.appPublicUrl, "public")) return NextResponse.json({ error: "Public App URL must be an internet-reachable HTTPS URL, not localhost" }, { status: 400 });
   const settings = await saveAISettings(body);
   if (typeof body.apiKey === "string" && body.provider) await saveStoredCredential(body.provider, body.apiKey);
-  const handoff = await saveHandoffSettings({ makeWebhookUrl: body.makeWebhookUrl, appPublicUrl: body.appPublicUrl });
-  return NextResponse.json({ ...settings, configured: await providerHasCredential(settings.provider), handoff: safeHandoffSettings(handoff) });
+  if (typeof body.postizApiKey === "string") await saveStoredPostizCredential(body.postizApiKey);
+  const postiz = await savePostizSettings({ apiUrl: body.postizApiUrl });
+  return NextResponse.json({ ...settings, configured: await providerHasCredential(settings.provider), postiz: safePostizSettings(postiz) });
 }
 
 export async function POST(request: NextRequest) {
   const originError = sameOrigin(request);
   if (originError) return originError;
-  const settings = await getEffectiveHandoffSettings();
-  if (!settings.makeWebhookUrl) return NextResponse.json({ error: "Set a webhook URL first" }, { status: 400 });
+  const postiz = await getPostizSettings();
+  if (!postiz.apiKey) return NextResponse.json({ error: "Set a Postiz API key first" }, { status: 400 });
   try {
-    const response = await fetch(settings.makeWebhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ source: "test-ping", message: "Savvy Cyber Kids connectivity test" }),
-      signal: AbortSignal.timeout(10_000)
-    });
-    if (!response.ok) throw new Error(`Webhook returned HTTP ${response.status}`);
+    const channelCount = await testPostizConnection();
     const testedAt = new Date().toISOString();
-    await saveHandoffTest({ status: "success", testedAt });
-    return NextResponse.json({ status: "success", testedAt });
+    await savePostizSettings({ lastTest: { status: "success", testedAt, channelCount } });
+    return NextResponse.json({ status: "success", testedAt, channelCount });
   } catch (error) {
     const reason = error instanceof Error ? error.message : "Connectivity test failed";
     const testedAt = new Date().toISOString();
-    await saveHandoffTest({ status: "failed", testedAt, reason });
+    await savePostizSettings({ lastTest: { status: "failed", testedAt, reason } as PostizTest });
     return NextResponse.json({ error: reason, testedAt }, { status: 502 });
   }
 }

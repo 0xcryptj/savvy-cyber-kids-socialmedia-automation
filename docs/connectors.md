@@ -1,33 +1,27 @@
-# Connector boundaries
+# Connector setup
 
-- RSS/WordPress: standard HTTP with RSS first, WordPress REST second, and page/OpenGraph scraping fallback in `src/ingest`. The configured sources are the Savvy Cyber Kids blog archive and Cyber Safety News Feed.
-- AI providers: OpenAI, Anthropic, and OpenAI-compatible endpoints can generate structured social copy. Provider, model, and compatible endpoint are selected in `/settings`; otherwise the local generator derives a safe package from the live article. Images always come from the source blog/news article and are composed into the branded 4:5 template.
-- Canva: the connected template has 24 pages at 1080×1350. The relevant variants are the general article layout (page 2), Online Behavior (pages 3–4), Conversation Starters (pages 5–7), and Breaking News (pages 8–9). `DesignRenderer`/`CanvaClient` leaves room for template autofill. The shared template URL is configured in `config/urls.ts`.
-- Make.com: the approved queue has a deliberate one-click webhook handoff. `MAKE_WEBHOOK_URL` is required and the post advances to `PUBLISHED` after a successful response, with the handoff timestamp and execution reference recorded when available. The payload includes the combined caption, separate hashtags, `mediaUrl`, `graphicUrl`, post ID, and optional SocialBee workspace ID for direct field mapping in Make.
-- SocialBee: SocialBee currently has no public API. Keep `SocialBeeClient` downstream of Make.com and use SocialBee's supported automation integrations (Make, Zapier, Pabbly, or Boost.space), or its Buffer publishing integration. Canva import and direct Instagram/Pinterest publishing are separate supported paths. The app does not claim a direct SocialBee API connection.
-- Local renderer: deterministic fallback and safe manual-post asset path.
+## Postiz
 
-No connector is claimed as live until credentials and an end-to-end test are completed.
+The approved queue is the local source of truth until a human schedules a package. Postiz then owns channel connections, calendar scheduling, and publishing.
 
-## Canva assets and licensing
+1. Create a Postiz API key in Postiz developer settings.
+2. Open this app’s **Settings → Publishing / Postiz**.
+3. Save the API key and the default API URL (`https://api.postiz.com/public/v1` for Postiz Cloud).
+4. Use **Test Postiz connection** to verify the key and see the number of connected channels.
+5. Connect Instagram, Facebook, LinkedIn, X, or other channels inside Postiz.
+6. Approve a post in this dashboard.
+7. In **Ready to post**, select **Schedule in Postiz**, choose channels and a date/time, then confirm.
 
-The connected Canva design exposes page previews, layout metadata, and asset references. The local app intentionally keeps the supplied SCK logo and uses the source article image at render time rather than copying every Canva image/video into the repository. Many Canva assets may be private, premium, or licensed only for use inside Canva. Export or download additional assets only after the design owner confirms the license and intended distribution.
+The dashboard uploads the rendered PNG directly to Postiz before creating the scheduled post. This avoids relying on Postiz being able to fetch a `localhost` URL during local development.
 
-## Recommended SocialBee integration
+The integration uses the documented Postiz Public API:
 
-Use one Make scenario:
+- `GET /integrations` to discover connected channels.
+- `POST /upload` to upload the generated graphic.
+- `POST /posts` with `type: "schedule"` to create one scheduled post for multiple integrations.
 
-1. In Make, create a **Webhooks → Custom webhook** trigger and copy its URL into `MAKE_WEBHOOK_URL`.
-2. Run the app locally, approve a post, and click **Mark as posted** once to send a sample payload. In Make, choose **Re-determine data structure** when prompted.
-3. Add **SocialBee → Create a Post** as the next module and connect the SocialBee account.
-4. Map `caption` to the post text, `mediaUrl` to the media URL, and select the SocialBee workspace, social profiles, category, and approval status. Keep the first run as a draft for verification.
-5. Turn the scenario on only after checking the draft in SocialBee. The app marks the post `PUBLISHED` only when Make returns a successful response.
+Provider-specific settings are kept minimal and use the channel identifier returned by Postiz. Instagram channels receive `post_type: "post"`; X receives `who_can_reply_post: "everyone"`; other providers use their documented `__type` identifier and can be expanded as platform-specific needs arise.
 
-For a local app, Make cannot fetch `http://localhost:3000`. Set `APP_PUBLIC_URL` to a temporary HTTPS tunnel that points at the app, then restart the dev server. Without it, the text handoff still works but `mediaUrl` remains empty and the SocialBee media field must be omitted or supplied separately.
+## AI and Canva
 
-## Current workflow references
-
-- Content: `https://savvycyberkids.org/tech-talk/blog/` and `https://savvycyberkids.org/tech-talk/savvy-cyber-kids-news-feed/`
-- Design template: `https://www.canva.com/design/DAGlY0QolDE/W2OZJohpR3FCSN7P9e__aw/edit`
-- Scheduler: `https://app.socialbee.com/`
-- Managed channels: Instagram, Facebook, LinkedIn, and X links are centralized in `config/urls.ts`.
+AI credentials are entered in Settings and stored locally with restricted file permissions. The local renderer remains deterministic and produces the branded 4:5 graphic that is uploaded to Postiz.

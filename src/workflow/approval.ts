@@ -31,12 +31,13 @@ export async function transitionPost(id: string, next: PostStatus, patch?: Parti
   assertTransition(post.status, next);
   const stamp = stamps[next];
   const failureReason = next === "FAILED" ? patch?.failureReason || "Workflow failed before completion." : undefined;
+  const stampValue = stamp ? patch?.[stamp] || new Date().toISOString() : undefined;
   const updated = await savePost({
     ...post,
     ...patch,
     status: next,
     ...(failureReason ? { failureReason } : {}),
-    ...(stamp ? { [stamp]: new Date().toISOString() } : {})
+    ...(stamp && stampValue ? { [stamp]: stampValue } : {})
   });
   if (next === "APPROVED" || next === "REJECTED") await recordFeedback({ postId: updated.id, category: updated.category, status: next, topicHeading: updated.topicHeading, articleTitle: updated.articleTitle, note: feedbackNote?.trim() || undefined, createdAt: new Date().toISOString() });
   return updated;

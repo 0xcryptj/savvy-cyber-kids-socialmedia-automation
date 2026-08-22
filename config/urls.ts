@@ -8,7 +8,6 @@ export const designUrls = {
 } as const;
 
 export const publishingUrls = {
-  socialBee: "https://app.socialbee.com/",
   instagram: "https://www.instagram.com/savvycyberkids/",
   facebook: "https://www.facebook.com/pages/Savvy-Cyber-Kids/154999394976",
   linkedin: "https://www.linkedin.com/company/savvy-cyber-kids/",
@@ -17,7 +16,6 @@ export const publishingUrls = {
 
 export const workflowLinks = [
   { label: "Open Canva template", href: designUrls.canvaTemplate },
-  { label: "Open SocialBee", href: publishingUrls.socialBee },
   { label: "Instagram", href: publishingUrls.instagram },
   { label: "Facebook", href: publishingUrls.facebook },
   { label: "LinkedIn", href: publishingUrls.linkedin },

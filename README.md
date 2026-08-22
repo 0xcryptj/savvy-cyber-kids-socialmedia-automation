@@ -12,7 +12,7 @@ The app is designed to run on your own computer at `http://localhost:3000`. It d
 4. Builds a branded social graphic from the article image.
 5. Places the package in the Review queue.
 6. Keeps approved posts visible until they are deliberately handed off.
-7. Records a successful Make.com handoff in Published History with a timestamp and execution reference when available.
+7. Uploads approved graphics to Postiz and schedules the approved package across selected channels.
 
 ## Requirements
 
@@ -135,20 +135,18 @@ The core local workflow works without these services:
 CANVA_CLIENT_ID=
 CANVA_CLIENT_SECRET=
 CANVA_TEMPLATE_URL=
-MAKE_WEBHOOK_URL=
-SOCIALBEE_WORKSPACE_ID=
+POSTIZ_API_URL=https://api.postiz.com/public/v1
+POSTIZ_API_KEY=
 AUTO_PUBLISH=false
 ```
 
-- `MAKE_WEBHOOK_URL` enables the deliberate outbound handoff from the approved queue.
-- Canva and SocialBee settings are reserved for their connector workflows.
+- `POSTIZ_API_KEY` enables channel discovery and deliberate scheduling from the approved queue.
+- `POSTIZ_API_URL` can point to a self-hosted Postiz instance instead of Postiz Cloud.
 - Keep `AUTO_PUBLISH=false` while testing. Approval remains required.
 
-### Easiest SocialBee setup: Make.com
+### Postiz setup
 
-The supported path is a single Make scenario: **Custom webhook → SocialBee / Create a Post**. The app sends the approved caption, individual hashtags, generated graphic URL, post ID, and optional SocialBee workspace ID. Follow the complete field-mapping checklist in [`docs/connectors.md`](docs/connectors.md).
-
-Because Make runs in the cloud, it cannot download an image from `localhost`. For image publishing during local testing, expose the development server through a temporary HTTPS tunnel and set `APP_PUBLIC_URL` to that tunnel origin. Keep the scenario in draft mode until the first test post is confirmed in SocialBee.
+Create a Postiz API key, enter it in **Settings → Publishing / Postiz**, test the connection, and connect the desired social channels in Postiz. After a post is approved, open **Ready to post**, choose the channels and schedule time, and select **Schedule in Postiz**. The dashboard uploads the generated graphic and creates one scheduled Postiz post for all selected channels.
 
 ## Using the app
 
@@ -158,8 +156,8 @@ Because Make runs in the cloud, it cannot download an image from `localhost`. Fo
 4. Open **Review post**. The Pending Review card on the dashboard opens the complete review queue.
 5. Edit the caption and all four hashtags together in the **Caption + hashtags** field, then approve, save for revision, or reject. Keep hashtags on the final line; the two required Savvy Cyber Kids tags must remain included.
 6. Approved posts remain visible in the review log and appear in **Ready to post**.
-7. Use **Mark as posted** only after the configured outbound handoff succeeds.
-8. Review completed handoffs in **Published history**.
+7. Choose channels and a time, then select **Schedule in Postiz**.
+8. Review scheduled and published work in **Published history**.
 
 The quick-post controls can also copy the caption, hashtags, and graphic link for manual posting from a logged-in social account.
 
@@ -251,7 +249,7 @@ src/content/          AI and local copy generation plus validation
 src/ingest/           RSS, WordPress, HTML, and OpenGraph ingestion
 src/workflow/         Approval state machine and post transitions
 src/workspace/        Local file-backed workspace state
-src/integrations/     Make.com, Canva, SocialBee, and provider boundaries
+src/integrations/     Postiz, Canva, and provider boundaries
 config/               Source URLs, feed rules, platform links, and content rules
 docs/                 Architecture, connector, and workflow notes
 ```
@@ -260,8 +258,7 @@ docs/                 Architecture, connector, and workflow notes
 
 - AI writing: configurable OpenAI, Anthropic, or OpenAI-compatible provider.
 - Canva: connected template specifications documented; local renderer remains deterministic and human-reviewable.
-- Make.com: implemented approved-post webhook handoff with SocialBee-ready payload fields.
-- SocialBee: no direct public API client is assumed; use Make’s supported SocialBee module.
+- Postiz: connected-channel discovery, media upload, and multi-channel scheduling are implemented.
 
 ## Safety defaults
 
