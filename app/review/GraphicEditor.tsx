@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Spinner } from "@/app/components/Spinner";
 import { GraphicAdjustments, OverlayRegion, adjustmentsToQuery, defaultAdjustments, maxRegions, scrimOptions, sliderFields } from "@/src/design/graphic-adjustments";
 import { GraphicCanvas, Selection } from "./GraphicCanvas";
@@ -34,6 +34,11 @@ export function GraphicEditor({
   onSaved: (adjustments: GraphicAdjustments | undefined) => void;
 }) {
   const [draft, setDraft] = useState<GraphicAdjustments>(saved ?? {});
+  // History is per gesture, not per frame: a drag pushes one entry when it ends,
+  // so undo steps back a whole move rather than one pointer sample.
+  const [history, setHistory] = useState<GraphicAdjustments[]>([saved ?? {}]);
+  const [historyAt, setHistoryAt] = useState(0);
+  const pending = useRef(saved ?? {});
   const [selection, setSelection] = useState<Selection>(null);
   const [showExact, setShowExact] = useState(false);
   const [showValues, setShowValues] = useState(false);
@@ -52,12 +57,70 @@ export function GraphicEditor({
     return `${graphicPath}?${query}${query ? "&" : ""}v=${version}`;
   }, [graphicPath, draft, version]);
 
+  useEffect(() => { pending.current = draft; }, [draft]);
+
+  /** Record the current draft as one undoable step. */
+  const commit = useCallback(() => {
+    setHistory((entries) => {
+      const trimmed = entries.slice(0, historyAt + 1);
+      if (JSON.stringify(trimmed[trimmed.length - 1]) === JSON.stringify(pending.current)) return entries;
+      const next = [...trimmed, pending.current].slice(-60);
+      setHistoryAt(next.length - 1);
+      return next;
+    });
+  }, [historyAt]);
+
+  /** Change and record in one go, for controls without a gesture to end. */
+  const apply = useCallback((next: GraphicAdjustments) => {
+    setDraft(next);
+    pending.current = next;
+    setHistory((entries) => {
+      const trimmed = entries.slice(0, historyAt + 1);
+      const updated = [...trimmed, next].slice(-60);
+      setHistoryAt(updated.length - 1);
+      return updated;
+    });
+  }, [historyAt]);
+
+  const canUndo = historyAt > 0;
+  const canRedo = historyAt < history.length - 1;
+
+  const undo = useCallback(() => {
+    if (historyAt <= 0) return;
+    const index = historyAt - 1;
+    setHistoryAt(index); setDraft(history[index]); pending.current = history[index];
+  }, [history, historyAt]);
+
+  const redo = useCallback(() => {
+    if (historyAt >= history.length - 1) return;
+    const index = historyAt + 1;
+    setHistoryAt(index); setDraft(history[index]); pending.current = history[index];
+  }, [history, historyAt]);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "z") return;
+      event.preventDefault();
+      if (event.shiftKey) redo(); else undo();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undo, redo]);
+
   function nudgeZoom(delta: number) {
-    setDraft({ ...draft, zoom: clamp((draft.zoom ?? defaultAdjustments.zoom) + delta, 0, 1) });
+    apply({ ...draft, zoom: clamp((draft.zoom ?? defaultAdjustments.zoom) + delta, 0, 1) });
+  }
+
+  function deleteSelected() {
+    if (typeof selection !== "object" || !selection) return;
+    apply({ ...draft, regions: regions.filter((_, index) => index !== selection.region) });
+    setSelection(null);
   }
 
   function updateRegion(index: number, patch: Partial<OverlayRegion>) {
-    setDraft({ ...draft, regions: regions.map((region, position) => (position === index ? { ...region, ...patch } : region)) });
+    apply({ ...draft, regions: regions.map((region, position) => (position === index ? { ...region, ...patch } : region)) });
   }
 
   async function save(clear = false) {
@@ -71,7 +134,9 @@ export function GraphicEditor({
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not save the layout");
-      setDraft(data.graphicAdjustments ?? {});
+      const next = data.graphicAdjustments ?? {};
+      setDraft(next); pending.current = next;
+      setHistory([next]); setHistoryAt(0);
       setVersion((current) => current + 1);
       onSaved(data.graphicAdjustments);
     } catch (err) {
@@ -88,9 +153,15 @@ export function GraphicEditor({
         <h3>Click anything to select it</h3>
         <p className="editor-sub">Drag to move. Drag the corner handle to resize. {saved ? "A saved layout is active — approving keeps it for the next article with a similar image." : "Nothing is kept until you save."}</p>
       </div>
+      <div className="editor-head-actions">
+        <div className="editor-history" role="group" aria-label="History">
+          <button type="button" onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
+          <button type="button" onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷</button>
+        </div>
       <div className="editor-view-toggle" role="group" aria-label="Preview mode">
         <button type="button" className={showExact ? "" : "is-on"} onClick={() => setShowExact(false)}>Edit</button>
         <button type="button" className={showExact ? "is-on" : ""} onClick={() => setShowExact(true)}>Exact render</button>
+      </div>
       </div>
     </header>
 
@@ -104,6 +175,8 @@ export function GraphicEditor({
       selection={selection}
       onSelect={setSelection}
       onChange={setDraft}
+      onCommit={commit}
+      onDeleteSelected={deleteSelected}
       exactSrc={exactSrc}
       showExact={showExact}
     />
@@ -113,7 +186,7 @@ export function GraphicEditor({
         <span className="editor-tool-label">Photo zoom</span>
         <div className="editor-stepper">
           <button type="button" onClick={() => nudgeZoom(-0.05)} aria-label="Zoom out">−</button>
-          <input type="range" min={0} max={1} step={0.01} value={values.zoom} onChange={(event) => setDraft({ ...draft, zoom: Number(event.target.value) })} aria-label="Photo zoom" />
+          <input type="range" min={0} max={1} step={0.01} value={values.zoom} onChange={(event) => setDraft({ ...draft, zoom: Number(event.target.value) })} onPointerUp={commit} onKeyUp={commit} aria-label="Photo zoom" />
           <button type="button" onClick={() => nudgeZoom(0.05)} aria-label="Zoom in">+</button>
           <strong>{Math.round(values.zoom * 100)}%</strong>
         </div>
@@ -123,7 +196,7 @@ export function GraphicEditor({
         <span className="editor-tool-label">Overlay</span>
         <div className="editor-segmented">
           {scrimOptions.map((option) => (
-            <button type="button" key={option} className={values.scrim === option ? "is-on" : ""} onClick={() => setDraft({ ...draft, scrim: option })}>{option}</button>
+            <button type="button" key={option} className={values.scrim === option ? "is-on" : ""} onClick={() => apply({ ...draft, scrim: option })}>{option}</button>
           ))}
         </div>
       </div>
@@ -137,7 +210,7 @@ export function GraphicEditor({
           maxLength={60}
           value={draft.topicHeading ?? topicHeading}
           onChange={(event) => setDraft({ ...draft, topicHeading: event.target.value })}
-          onBlur={(event) => setDraft({ ...draft, topicHeading: event.target.value.trim() || undefined })}
+          onBlur={(event) => apply({ ...draft, topicHeading: event.target.value.trim() || undefined })}
         />
       </label>
       <p className="editor-note">The headline below the divider is the article title and is preserved exactly.</p>
@@ -147,8 +220,8 @@ export function GraphicEditor({
       <div className="editor-panel-head">
         <span>Shaded areas</span>
         <div className="editor-inline-actions">
-          <button type="button" disabled={regions.length >= maxRegions} onClick={() => { setDraft({ ...draft, regions: [...regions, newRegion] }); setSelection({ region: regions.length }); }}>Add</button>
-          {selectedRegion !== null && regions[selectedRegion] ? <button type="button" onClick={() => { setDraft({ ...draft, regions: regions.filter((_, index) => index !== selectedRegion) }); setSelection(null); }}>Remove</button> : null}
+          <button type="button" disabled={regions.length >= maxRegions} onClick={() => { apply({ ...draft, regions: [...regions, newRegion] }); setSelection({ region: regions.length }); }}>Add</button>
+          {selectedRegion !== null && regions[selectedRegion] ? <button type="button" onClick={deleteSelected}>Remove</button> : null}
         </div>
       </div>
       {selectedRegion !== null && regions[selectedRegion] ? <div className="editor-region-controls">
@@ -165,14 +238,14 @@ export function GraphicEditor({
       {sliderFields.map((field) => (
         <label className="editor-value" key={field.key}>
           <span>{field.label}<strong>{formatValue(values[field.key], field.displayScale, field.unit)}</strong></span>
-          <input type="range" min={field.min} max={field.max} step={field.step} value={values[field.key]} onChange={(event) => setDraft({ ...draft, [field.key]: Number(event.target.value) })} />
+          <input type="range" min={field.min} max={field.max} step={field.step} value={values[field.key]} onChange={(event) => setDraft({ ...draft, [field.key]: Number(event.target.value) })} onPointerUp={commit} onKeyUp={commit} />
         </label>
       ))}
     </div> : null}
 
     <footer className="editor-actions">
       <button type="button" onClick={() => save()} disabled={saving || !dirty}>{saving ? <Spinner label="Saving…" /> : "Save layout"}</button>
-      <button type="button" className="secondary" onClick={() => { setDraft({}); setSelection(null); }} disabled={saving || !Object.keys(draft).length}>Reset</button>
+      <button type="button" className="secondary" onClick={() => { apply({}); setSelection(null); }} disabled={saving || !Object.keys(draft).length}>Reset</button>
       {saved ? <button type="button" className="outline" onClick={() => save(true)} disabled={saving}>Back to automatic</button> : null}
       {error ? <span className="error-text">{error}</span> : null}
     </footer>

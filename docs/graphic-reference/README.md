@@ -88,6 +88,19 @@ The live preview is a preview: browser and Satori font metrics differ slightly,
 so a line break can land a word differently. Use **Exact render** to confirm
 before approving.
 
+Dragging the photo goes through `focusSensitivity`, not a fixed sign.
+`objectPosition` means opposite things depending on the regime: on an axis being
+cropped, raising the focus reveals more of the far side and the image slides the
+*opposite* way to the number; on a letterboxed axis it is positioned in free
+space and slides the *same* way. A wide banner at partial zoom is cropped on one
+axis and letterboxed on the other simultaneously. Dividing the pointer delta by
+the sensitivity makes the image track the pointer in every case, and a
+near-zero value means the axis is locked and the drag is ignored.
+
+Keyboard: arrows nudge the selection (shift for a larger step), Delete removes a
+selected shaded area, Escape deselects, Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z undo and
+redo. History is per gesture, so undo steps back a whole drag.
+
 Do not set `crossOrigin` on the image-sizing probe. `naturalWidth` needs no CORS,
 and requesting it makes the load fail outright on hosts that send no
 `Access-Control-Allow-Origin` — savvycyberkids.org among them, which is most of
@@ -105,6 +118,20 @@ inert.
 
 The article title is deliberately not editable here: preserving it exactly is a
 product rule enforced in `src/content/validate.ts`.
+
+## When the article image cannot be used
+
+`inspectArticleImage` decides this, and "available" means *renderable*, not
+merely fetchable: it sends the same Accept header the renderer sends and the
+bytes must decode. A URL returning 200 in a format the renderer cannot read used
+to pass and then land in the review queue as IMAGE UNAVAILABLE with no fallback.
+
+When it is not available, `generateOpenAIBackground` produces a photorealistic
+editorial photograph instead — subject in the upper two-thirds, quieter lower
+third for the headline, no text, logos, or UI. It needs `OPENAI_API_KEY` and the
+OpenAI provider, takes roughly a minute, and runs once at post creation rather
+than per render. If it fails the post is still created, flagged
+`SOURCE_FALLBACK`, and the review page says so.
 
 ## Remembered layouts
 

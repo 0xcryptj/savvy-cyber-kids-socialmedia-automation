@@ -7,22 +7,34 @@ type ImageResponsePayload = { data?: Array<{ b64_json?: string; url?: string }> 
 export type ArticleImageInfo = { available: boolean; ratio?: number };
 
 /**
- * Fetches the article image once and reports both whether it is usable and its
- * aspect ratio, which is what decides how the composer should frame it and
- * which remembered layout applies.
+ * Fetches the article image once and reports whether the composer can actually
+ * draw it, plus its aspect ratio.
+ *
+ * "Available" has to mean renderable, not merely fetchable. A URL that returns
+ * 200 with a format the renderer cannot decode used to pass this check and then
+ * land in the review queue as IMAGE UNAVAILABLE, with no fallback — so the same
+ * Accept header the renderer sends is used here, and the bytes must decode.
  */
 export async function inspectArticleImage(imageUrl?: string): Promise<ArticleImageInfo> {
   if (!imageUrl) return { available: false };
   try {
-    const response = await fetch(imageUrl.replaceAll("&amp;", "&"), { headers: { Accept: "image/*" }, redirect: "follow", signal: AbortSignal.timeout(8000) });
-    if (!response.ok || !(response.headers.get("content-type") || "").startsWith("image/")) return { available: false };
+    const response = await fetch(imageUrl.replaceAll("&amp;", "&"), {
+      headers: { Accept: "image/png,image/jpeg,image/gif;q=0.8,*/*;q=0.5" },
+      redirect: "follow",
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!response.ok) return { available: false };
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (!bytes.length) return { available: false };
     try {
       const sharp = (await import("sharp")).default;
-      const { width, height } = await sharp(Buffer.from(await response.arrayBuffer())).metadata();
-      return { available: true, ratio: width && height ? width / height : undefined };
+      const { width, height } = await sharp(bytes).metadata();
+      if (!width || !height) return { available: false };
+      return { available: true, ratio: width / height };
     } catch {
-      // Usable, just unmeasurable: no remembered layout, but still a valid image.
-      return { available: true };
+      // Without sharp, fall back to trusting the content type. The renderer
+      // sniffs the bytes itself, so a wrong guess degrades rather than breaks.
+      return { available: (response.headers.get("content-type") || "").startsWith("image/") };
     }
   } catch {
     return { available: false };
@@ -43,9 +55,13 @@ export async function generateOpenAIBackground(input: RenderRequest & { guidance
   const { settings, key } = await imageApiKey();
   if (!key) throw new Error("OPENAI_API_KEY is not configured");
   const base = (settings.baseUrl || "https://api.openai.com/v1").replace(/\/$/, "");
-  const prompt = `Create a premium editorial background for a family cybersecurity social-media post. Topic: ${input.topicHeading}. Article: ${input.articleTitle}. ${input.guidance || ""}
+  const prompt = `A photorealistic editorial photograph for a family cybersecurity article. Topic: ${input.topicHeading}. Article: ${input.articleTitle}. ${input.guidance || ""}
 
-Use a polished 4:5 portrait composition with a strong visual focal point in the upper two-thirds, generous but intentional negative space for a local text overlay in the lower third, atmospheric gradients and cohesive navy, cyan, and warm orange accents. The image must feel like an enterprise newsroom graphic: clean hierarchy, refined lighting, balanced spacing, and no accidental black voids. Do not render any words, letters, numbers, logos, watermarks, banners, or fake UI. Do not place important details against the edges.`.slice(0, 3500);
+Shoot it like a real photograph taken on a full-frame camera with a fast prime lens: natural available light, true-to-life skin tones and materials, believable depth of field, subtle imperfection, the look of documentary lifestyle photography rather than stock. Real people and real rooms, warm and unposed, safe and age-appropriate.
+
+Composition: 4:5 portrait. Put the subject in the upper two-thirds and keep the lower third quieter and less detailed, because a headline is composited over it afterwards. Keep important detail away from all four edges, since the frame may be cropped.
+
+Do not render any words, letters, numbers, logos, watermarks, banners, user interface, or screen content. Nothing illustrated, 3D-rendered, cartoon, or synthetic-looking. No heavy colour grading and no glowing blue technology clichés.`.slice(0, 3500);
   const response = await fetch(`${base}/images/generations`, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${key}` },

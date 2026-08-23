@@ -106,6 +106,29 @@ export function imagePlacement(sourceWidth: number, sourceHeight: number, zoom: 
   };
 }
 
+/**
+ * How far the image moves, in canvas pixels, per one point of focus change.
+ *
+ * The sign is not fixed, which is the whole reason this exists. On an axis that
+ * is being cropped, raising the focus reveals more of the far side and the image
+ * slides the *opposite* way to the number. On an axis that is letterboxed, the
+ * image is simply positioned in the free space and slides the *same* way. A
+ * dragger that assumes one sign feels correct in one regime and inverted in the
+ * other, which is exactly how it felt.
+ *
+ * Dividing the pointer delta by this makes the image track the pointer in both.
+ * A value at or near zero means the axis has no freedom — a wide image cropped
+ * to the frame cannot move vertically — and the drag on that axis is ignored.
+ */
+export function focusSensitivity(sourceWidth: number, sourceHeight: number, zoom: number) {
+  const crop = cropRectForZoom(sourceWidth, sourceHeight, zoom, 0, 0);
+  const scale = Math.min(canvasWidth / crop.width, canvasHeight / crop.height);
+  return {
+    x: (canvasWidth - crop.width * scale - (sourceWidth - crop.width) * scale) / 100,
+    y: (canvasHeight - crop.height * scale - (sourceHeight - crop.height) * scale) / 100
+  };
+}
+
 export type TitleWord = { text: string; start: number; end: number };
 export type TitleLine = { text: string; start: number; end: number };
 

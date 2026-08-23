@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canvasHeight, canvasWidth, composition, cropRectForZoom, imagePlacement, titleFit } from "@/src/design/graphic-layout";
+import { canvasHeight, canvasWidth, composition, cropRectForZoom, focusSensitivity, imagePlacement, titleFit } from "@/src/design/graphic-layout";
 
 /**
  * What the server gets from objectFit, expressed directly. The browser preview
@@ -106,5 +106,51 @@ describe("titleFit", () => {
   it("shrinks the headline when asked to scale down", () => {
     expect(fit("Australia says Roblox hasn’t fixed its problem", { titleScale: 0.8 }).fontSize)
       .toBeLessThanOrEqual(fit("Australia says Roblox hasn’t fixed its problem").fontSize);
+  });
+});
+
+describe("focusSensitivity", () => {
+  const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+  /** Exactly what the drag handler does, so the test fails when dragging breaks. */
+  function dragBy(width: number, height: number, zoom: number, dx: number, dy: number) {
+    const sensitivity = focusSensitivity(width, height, zoom);
+    const focusX = Math.abs(sensitivity.x) < 0.01 ? 50 : clamp(50 + dx / sensitivity.x, 0, 100);
+    const focusY = Math.abs(sensitivity.y) < 0.01 ? 50 : clamp(50 + dy / sensitivity.y, 0, 100);
+    const before = imagePlacement(width, height, zoom, 50, 50);
+    const after = imagePlacement(width, height, zoom, focusX, focusY);
+    return { x: after.left - before.left, y: after.top - before.top, sensitivity };
+  }
+
+  // objectPosition means opposite things depending on the regime: on a cropped
+  // axis a higher focus slides the image one way, on a letterboxed axis the
+  // other. A single fixed sign felt inverted in whichever regime it was not
+  // written for, which is exactly what was reported.
+  it.each([
+    ["wide banner, cropped horizontally", 1200, 624, 1],
+    ["wide banner, letterboxed vertically", 1200, 624, 0],
+    ["wide banner, cropped and letterboxed at once", 1200, 624, 0.55],
+    ["tall source, cropped vertically", 400, 1200, 1],
+    ["blog photo", 800, 533, 1]
+  ])("moves the image with the pointer for %s", (_label, width, height, zoom) => {
+    const moved = dragBy(width, height, zoom, 60, 60);
+    // An axis with no freedom must not move; one with freedom must follow.
+    if (Math.abs(moved.sensitivity.x) < 0.01) expect(moved.x).toBe(0);
+    else expect(moved.x).toBeGreaterThan(0);
+    if (Math.abs(moved.sensitivity.y) < 0.01) expect(moved.y).toBe(0);
+    else expect(moved.y).toBeGreaterThan(0);
+  });
+
+  it("tracks the pointer roughly one to one", () => {
+    const moved = dragBy(1200, 624, 0.55, 60, 60);
+    expect(Math.abs(moved.x - 60)).toBeLessThan(6);
+    expect(Math.abs(moved.y - 60)).toBeLessThan(6);
+  });
+
+  it("reports no freedom on an axis that cannot move", () => {
+    // A wide image cropped to the frame fills the height exactly.
+    expect(Math.abs(focusSensitivity(1200, 624, 1).y)).toBeLessThan(0.01);
+    // Shown whole, it cannot move sideways.
+    expect(Math.abs(focusSensitivity(1200, 624, 0).x)).toBeLessThan(0.01);
   });
 });

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { GraphicAdjustments, OverlayRegion, defaultAdjustments } from "@/src/design/graphic-adjustments";
-import { canvasHeight, canvasWidth, composition, headingBlockHeight, textBottomInset } from "@/src/design/graphic-layout";
+import { canvasHeight, canvasWidth, composition, focusSensitivity, headingBlockHeight, textBottomInset } from "@/src/design/graphic-layout";
 import { LivePreview } from "./LivePreview";
 
 export type Selection = "image" | "heading" | "headline" | { region: number } | null;
@@ -13,13 +13,9 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 const sameSelection = (a: Selection, b: Selection) =>
   typeof a === "object" && a && typeof b === "object" && b ? a.region === b.region : a === b;
 
-/**
- * Selection and dragging over the live preview.
- *
- * Everything here is local: a drag changes React state and the browser repaints
- * the preview immediately. The server render is only asked for when the reviewer
- * wants to confirm the exact output, or when the layout is saved.
- */
+/** Below this the axis cannot move at all, so a drag on it is ignored. */
+const immobile = 0.01;
+
 export function GraphicCanvas({
   imageUrl,
   topicHeading,
@@ -30,6 +26,8 @@ export function GraphicCanvas({
   selection,
   onSelect,
   onChange,
+  onCommit,
+  onDeleteSelected,
   exactSrc,
   showExact
 }: {
@@ -42,6 +40,9 @@ export function GraphicCanvas({
   selection: Selection;
   onSelect: (selection: Selection) => void;
   onChange: (next: GraphicAdjustments) => void;
+  /** Called once when a gesture finishes, so undo steps are gestures not frames. */
+  onCommit: () => void;
+  onDeleteSelected: () => void;
   exactSrc: string;
   showExact: boolean;
 }) {
@@ -55,8 +56,8 @@ export function GraphicCanvas({
   const layout = composition(values);
   const regions = values.regions ?? [];
 
-  // Everything inside is laid out at true canvas size and scaled down as a
-  // whole, so no measurement has to be converted twice.
+  // Everything inside is laid out at true canvas size and scaled as a whole, so
+  // no measurement is ever converted twice.
   useLayoutEffect(() => {
     const frame = frameRef.current;
     if (!frame) return;
@@ -83,27 +84,34 @@ export function GraphicCanvas({
   const latest = useRef(values);
   useEffect(() => { latest.current = values; }, [values]);
 
+  /** Shift the image by a pixel amount, whichever regime each axis is in. */
+  const nudgeImage = useCallback((from: GraphicAdjustments, dx: number, dy: number): GraphicAdjustments => {
+    const base = { ...defaultAdjustments, ...from };
+    if (!imageSize) return from;
+    const sensitivity = focusSensitivity(imageSize.width, imageSize.height, base.zoom);
+    return {
+      ...from,
+      focusX: Math.abs(sensitivity.x) < immobile ? base.focusX : clamp(base.focusX + dx / sensitivity.x, 0, 100),
+      focusY: Math.abs(sensitivity.y) < immobile ? base.focusY : clamp(base.focusY + dy / sensitivity.y, 0, 100)
+    };
+  }, [imageSize]);
+
   const move = useCallback((event: PointerEvent) => {
     const drag = dragRef.current;
     if (!drag) return;
     const dx = (event.clientX - drag.startX) / scale;
     const dy = (event.clientY - drag.startY) / scale;
     const from = { ...defaultAdjustments, ...drag.from };
-    const next: GraphicAdjustments = { ...drag.from };
+    let next: GraphicAdjustments = { ...drag.from };
 
     if (drag.target === "image") {
-      if (drag.kind === "scale") {
-        next.zoom = clamp(from.zoom + dy / 600, 0, 1);
-      } else {
-        // Drag the photo, not the window onto it: pull right, see more of the left.
-        next.focusX = clamp(from.focusX - (dx / canvasWidth) * 200, 0, 100);
-        next.focusY = clamp(from.focusY - (dy / canvasHeight) * 200, 0, 100);
-      }
+      next = drag.kind === "scale"
+        ? { ...next, zoom: clamp(from.zoom + dy / 600, 0, 1) }
+        : nudgeImage(drag.from, dx, dy);
     } else if (drag.target === "heading" || drag.target === "headline") {
       if (drag.kind === "scale") {
-        const key = drag.target === "heading" ? "headingScale" : "titleScale";
-        const base = drag.target === "heading" ? from.headingScale : from.titleScale;
-        next[key] = clamp(base + dy / 400, drag.target === "heading" ? 0.6 : 0.6, drag.target === "heading" ? 1.4 : 1.2);
+        if (drag.target === "heading") next.headingScale = clamp(from.headingScale + dy / 400, 0.6, 1.4);
+        else next.titleScale = clamp(from.titleScale + dy / 400, 0.6, 1.2);
       } else {
         next.textTop = clamp(Math.round((from.textTop + dy) / 5) * 5, 600, 1100);
       }
@@ -119,9 +127,13 @@ export function GraphicCanvas({
       next.regions = (drag.from.regions ?? []).map((region, position) => (position === index ? updated : region));
     }
     onChange(next);
-  }, [onChange, scale]);
+  }, [nudgeImage, onChange, scale]);
 
-  const end = useCallback(() => { dragRef.current = null; setDragging(false); }, []);
+  const end = useCallback(() => {
+    if (dragRef.current) onCommit();
+    dragRef.current = null;
+    setDragging(false);
+  }, [onCommit]);
 
   useEffect(() => {
     if (!dragging) return;
@@ -135,6 +147,40 @@ export function GraphicCanvas({
     };
   }, [dragging, move, end]);
 
+  // Arrow keys nudge the selection, the way any canvas tool behaves.
+  useEffect(() => {
+    if (!selection || showExact) return;
+    function onKey(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
+      if (event.key === "Escape") { onSelect(null); return; }
+      if (event.key === "Delete" || event.key === "Backspace") {
+        if (typeof selection === "object" && selection) { event.preventDefault(); onDeleteSelected(); }
+        return;
+      }
+      const step = event.shiftKey ? 20 : 4;
+      const dx = event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0;
+      const dy = event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0;
+      if (!dx && !dy) return;
+      event.preventDefault();
+      const current = latest.current;
+      const base = { ...defaultAdjustments, ...current };
+
+      if (selection === "image") onChange(nudgeImage(current, dx, dy));
+      else if (selection === "heading" || selection === "headline") onChange({ ...current, textTop: clamp(base.textTop + dy, 600, 1100) });
+      else if (typeof selection === "object" && selection) {
+        const list = current.regions ?? [];
+        const source = list[selection.region];
+        if (!source) return;
+        const updated = { ...source, x: clamp(source.x + (dx / canvasWidth) * 100, 0, 100 - source.width), y: clamp(source.y + (dy / canvasHeight) * 100, 0, 100 - source.height) };
+        onChange({ ...current, regions: list.map((region, index) => (index === selection.region ? updated : region)) });
+      }
+      onCommit();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selection, showExact, nudgeImage, onChange, onCommit, onSelect, onDeleteSelected]);
+
   function start(kind: DragKind, target: Selection, event: React.PointerEvent) {
     event.preventDefault();
     event.stopPropagation();
@@ -143,22 +189,16 @@ export function GraphicCanvas({
     setDragging(true);
   }
 
-  function box(target: Selection, label: string, style: React.CSSProperties, hint: string) {
+  function Box({ target, label, style, hint }: { target: Selection; label: string; style: React.CSSProperties; hint: string }) {
     const active = sameSelection(selection, target);
     return (
-      <div
-        className={`ec-box ${active ? "is-selected" : ""}`}
-        style={style}
-        onPointerDown={(event) => start("move", target, event)}
-        title={hint}
-      >
+      <div className={`ec-box ${active ? "is-selected" : ""}`} style={style} onPointerDown={(event) => start("move", target, event)} title={hint}>
         <span className="ec-label">{label}</span>
         {active ? <span className="ec-scale" onPointerDown={(event) => start("scale", target, event)} title="Drag down to grow, up to shrink" /> : null}
       </div>
     );
   }
 
-  const headingHeight = headingBlockHeight;
   const textHeight = canvasHeight - textBottomInset - layout.textTop;
 
   return (
@@ -180,14 +220,17 @@ export function GraphicCanvas({
         )}
 
         {!showExact ? <>
-          {box("image", "Photo", { left: 0, top: 0, width: canvasWidth, height: layout.textTop }, "Drag to move the photo")}
-          {box("heading", "Heading", { left: 0, top: layout.textTop, width: canvasWidth, height: headingHeight }, "Drag to move, corner to resize")}
-          {box("headline", "Headline", { left: 0, top: layout.textTop + headingHeight, width: canvasWidth, height: Math.max(40, textHeight - headingHeight) }, "Drag to move, corner to resize")}
-          {regions.map((region, index) => box(
-            { region: index },
-            "Shade",
-            { left: `${region.x}%`, top: `${region.y}%`, width: `${region.width}%`, height: `${region.height}%` },
-            "Drag to move, corner to resize"
+          <Box target="image" label="Photo" style={{ left: 0, top: 0, width: canvasWidth, height: layout.textTop }} hint="Drag to move the photo" />
+          <Box target="heading" label="Heading" style={{ left: 0, top: layout.textTop, width: canvasWidth, height: headingBlockHeight }} hint="Drag to move, corner to resize" />
+          <Box target="headline" label="Headline" style={{ left: 0, top: layout.textTop + headingBlockHeight, width: canvasWidth, height: Math.max(40, textHeight - headingBlockHeight) }} hint="Drag to move, corner to resize" />
+          {regions.map((region, index) => (
+            <Box
+              key={`region-${index}`}
+              target={{ region: index }}
+              label="Shade"
+              style={{ left: `${region.x}%`, top: `${region.y}%`, width: `${region.width}%`, height: `${region.height}%` }}
+              hint="Drag to move, corner to resize. Delete removes it."
+            />
           ))}
         </> : null}
       </div>
