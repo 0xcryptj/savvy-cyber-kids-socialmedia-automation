@@ -1,3 +1,4 @@
+import { safeFetch } from "@/src/lib/safe-fetch";
 import { getAISettings } from "@/src/config/ai-settings";
 import { getStoredCredential } from "@/src/config/credentials";
 import { DesignRenderer, RenderRequest, RenderedGraphic } from "./renderer";
@@ -18,9 +19,9 @@ export type ArticleImageInfo = { available: boolean; ratio?: number };
 export async function inspectArticleImage(imageUrl?: string): Promise<ArticleImageInfo> {
   if (!imageUrl) return { available: false };
   try {
-    const response = await fetch(imageUrl.replaceAll("&amp;", "&"), {
+    // Article image URLs arrive with the article, so they are untrusted.
+    const response = await safeFetch(imageUrl.replaceAll("&amp;", "&"), {
       headers: { Accept: "image/png,image/jpeg,image/gif;q=0.8,*/*;q=0.5" },
-      redirect: "follow",
       signal: AbortSignal.timeout(8000)
     });
     if (!response.ok) return { available: false };

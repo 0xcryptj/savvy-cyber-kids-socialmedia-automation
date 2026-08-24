@@ -1,3 +1,4 @@
+import { safeFetch } from "@/src/lib/safe-fetch";
 import { ImageResponse } from "next/og";
 import { readFile } from "fs/promises";
 import path from "path";
@@ -34,8 +35,9 @@ async function resolveImageSource(imageUrl: string | undefined, zoom: number, fo
   try {
     const parsed = new URL(imageUrl.replaceAll("&amp;", "&"));
     if (parsed.protocol === "data:" && parsed.pathname.startsWith("image/")) return imageUrl;
-    if (!["http:", "https:"].includes(parsed.protocol) || /^(localhost|127\.|0\.0\.0\.0|::1|169\.254\.)/i.test(parsed.hostname)) return undefined;
-    const response = await fetch(parsed, {
+    // The old hostname test missed private ranges, decimal and IPv4-mapped
+    // addresses, internal DNS names, and did nothing about redirects.
+    const response = await safeFetch(parsed, {
       headers: {
         // Satori decodes PNG, JPEG and GIF only. Advertising webp/avif here is
         // what made news CDNs hand back a webp that the renderer then choked
@@ -44,7 +46,6 @@ async function resolveImageSource(imageUrl: string | undefined, zoom: number, fo
         "User-Agent": "SavvyCyberKidsGraphicRenderer/1.0",
         Referer: `${parsed.origin}/`
       },
-      redirect: "follow",
       signal: AbortSignal.timeout(15000)
     });
     if (!response.ok) return undefined;

@@ -1,3 +1,5 @@
+import { safeFetch } from "@/src/lib/safe-fetch";
+
 const defaultHeaders = {
   Accept: "application/json, text/html, application/rss+xml",
   "User-Agent": "SavvyCyberKidsSocialBot/0.1"
@@ -17,13 +19,15 @@ function requestInit(revalidate: number, noStore: boolean): RequestInit {
 }
 
 export async function fetchText(url: string, revalidate = 300, noStore = false): Promise<string> {
-  const response = await fetch(url, requestInit(revalidate, noStore));
+  // Feed items and article URLs are attacker-influenceable, so these go through
+  // the guard rather than straight to fetch.
+  const response = await safeFetch(url, requestInit(revalidate, noStore));
   if (!response.ok) throw new Error(`Request failed (${response.status}): ${url}`);
   return response.text();
 }
 
 export async function fetchJson<T>(url: string, revalidate = 300, noStore = false): Promise<T> {
-  const response = await fetch(url, requestInit(revalidate, noStore));
+  const response = await safeFetch(url, requestInit(revalidate, noStore));
   if (!response.ok) throw new Error(`Request failed (${response.status}): ${url}`);
   return response.json() as Promise<T>;
 }
