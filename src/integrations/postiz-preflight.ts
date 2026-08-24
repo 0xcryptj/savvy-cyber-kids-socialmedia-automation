@@ -1,6 +1,6 @@
 import { WorkspacePost } from "@/src/workspace/types";
 import { PostizIntegration } from "./postiz-client-types";
-import { providerLimit, providerUnsupportedReason } from "./postiz-providers";
+import { providerLabel, providerLimit, providerUnsupportedReason } from "./postiz-providers";
 import { composePostContent, graphicFingerprint } from "./postiz-content";
 import { alreadyExported, contentFingerprint, createBudgetRemaining, listExportRecords } from "./postiz-ledger";
 
@@ -16,6 +16,8 @@ export type PreflightIssue = {
   code: "unsupported_channel" | "too_long" | "no_graphic" | "empty_caption" | "duplicate" | "budget" | "channel_missing";
   message: string;
   integrationId?: string;
+  /** On `too_long`, the platform's cap, so the editor can count against it. */
+  limit?: number;
 };
 
 export type PostPreflight = { postId: string; title: string; ok: boolean; contentLength: number; issues: PreflightIssue[] };
@@ -56,16 +58,22 @@ export async function preflightExport(posts: WorkspacePost[], integrations: Post
     if (!content) postIssues.push({ level: "block", code: "empty_caption", message: "This post has no caption text to send." });
     if (!post.frozenGraphicPath && !graphicFingerprint(post)) postIssues.push({ level: "block", code: "no_graphic", message: "This post has no graphic to attach." });
 
+    // Reported per platform, not per channel: three X accounts share one limit
+    // and should not produce the same message three times.
+    const reportedLimits = new Set<string>();
     for (const integration of usableChannels) {
       const limit = providerLimit(integration.identifier);
-      if (limit && content.length > limit) {
-        postIssues.push({
-          level: "block",
-          code: "too_long",
-          message: `Caption and hashtags are ${content.length} characters; ${integration.name} allows ${limit}.`,
-          integrationId: integration.id
-        });
-      }
+      if (!limit || content.length <= limit) continue;
+      const label = providerLabel(integration.identifier);
+      if (reportedLimits.has(label)) continue;
+      reportedLimits.add(label);
+      postIssues.push({
+        level: "block",
+        code: "too_long",
+        message: `${content.length} characters. ${label} allows ${limit}, so this is ${content.length - limit} over.`,
+        integrationId: integration.id,
+        limit
+      });
     }
 
     const record = records.find((entry) => entry.postId === post.id);

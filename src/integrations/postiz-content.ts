@@ -1,15 +1,9 @@
 import { createHash } from "crypto";
 import { WorkspacePost } from "@/src/workspace/types";
 
-/**
- * The exact text handed to Postiz. Preflight and export both call this so the
- * length a reviewer is warned about is the length that actually gets posted.
- */
-export function composePostContent(post: WorkspacePost): string {
-  const caption = post.caption.trim();
-  const hashtags = post.hashtags.filter((tag) => tag.trim()).join(" ").trim();
-  return hashtags ? `${caption}\n\n${hashtags}`.trim() : caption;
-}
+// Re-exported so server-side callers keep one import for Postiz content, while
+// the browser pulls the same function without dragging Node's crypto along.
+export { composePostContent } from "@/src/content/post-text";
 
 /**
  * Identifies the rendered graphic alone, so an edit that only touches the

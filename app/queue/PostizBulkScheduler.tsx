@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Spinner } from "@/app/components/Spinner";
 import { WorkspacePost } from "@/src/workspace/types";
+import { composePostContent } from "@/src/content/post-text";
+import { BrandIcon } from "@/app/components/BrandIcon";
 
 type Integration = { id: string; name: string; identifier: string; profile?: string };
-type PreflightIssue = { level: "block" | "warn"; code: string; message: string; integrationId?: string };
+type PreflightIssue = { level: "block" | "warn"; code: string; message: string; integrationId?: string; limit?: number };
 type PostPreflight = { postId: string; title: string; ok: boolean; contentLength: number; issues: PreflightIssue[] };
 type Preflight = {
   ok: boolean;
@@ -38,6 +40,9 @@ export function PostizBulkScheduler({ posts }: { posts: WorkspacePost[] }) {
   const [checking, setChecking] = useState(false);
   const [records, setRecords] = useState<Record<string, ExportRecord>>({});
   const [outcomes, setOutcomes] = useState<Record<string, ExportOutcome>>({});
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draftCaption, setDraftCaption] = useState("");
+  const [savingCaption, setSavingCaption] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -133,6 +138,38 @@ export function PostizBulkScheduler({ posts }: { posts: WorkspacePost[] }) {
   const togglePost = (id: string) => setSelectedPosts((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
   const toggleChannel = (id: string) => setSelectedChannels((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
 
+  function openCaptionEditor(post: WorkspacePost) {
+    setEditingId((current) => (current === post.id ? null : post.id));
+    setDraftCaption(post.caption);
+    setError(null);
+  }
+
+  /**
+   * Trimming happens here rather than sending the post back through review: the
+   * copy is already approved, it is only too long for one platform.
+   */
+  async function saveCaption(id: string) {
+    setSavingCaption(true); setError(null);
+    try {
+      const response = await fetch(`/api/posts/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ caption: draftCaption })
+      });
+      const updated = await response.json();
+      if (!response.ok) throw new Error(updated.error || "Could not save the caption");
+      setLivePosts((current) => current.map((post) => (post.id === id ? { ...post, caption: updated.caption } : post)));
+      setEditingId(null);
+      // The edit changes the content, so anything already exported re-opens.
+      setOutcomes((current) => { const next = { ...current }; delete next[id]; return next; });
+      setMessage("Caption saved.");
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Could not save the caption");
+    } finally {
+      setSavingCaption(false);
+    }
+  }
+
   async function runExport() {
     setSaving(true); setMessage(null); setError(null);
     try {
@@ -187,7 +224,7 @@ export function PostizBulkScheduler({ posts }: { posts: WorkspacePost[] }) {
   return <>
     <div className="queue-toolbar card">
       <div>
-        <p className="eyebrow">EXPORT TO POSTIZ</p>
+        <p className="eyebrow eyebrow-brand"><BrandIcon identifier="postiz" size={13} /> EXPORT TO POSTIZ</p>
         <strong>{selectedCount ? `${selectedCount} selected` : "Select approved content"}</strong>
         <span className="field-hint">Postiz handles scheduling and posting. This sends the graphic, caption, and hashtags across.</span>
       </div>
@@ -199,7 +236,7 @@ export function PostizBulkScheduler({ posts }: { posts: WorkspacePost[] }) {
 
     {selectedCount ? <section className="card bulk-schedule-panel">
       <div className="bulk-panel-heading">
-        <div><p className="eyebrow">POSTIZ DELIVERY</p><h3>Send {selectedCount} approved post{selectedCount === 1 ? "" : "s"}</h3></div>
+        <div><p className="eyebrow eyebrow-brand"><BrandIcon identifier="postiz" size={13} /> POSTIZ DELIVERY</p><h3>Send {selectedCount} approved post{selectedCount === 1 ? "" : "s"}</h3></div>
         <span className="status">{selectedChannels.length} channel{selectedChannels.length === 1 ? "" : "s"}</span>
       </div>
 
@@ -212,7 +249,7 @@ export function PostizBulkScheduler({ posts }: { posts: WorkspacePost[] }) {
             <button type="button" className={exportType === "schedule" ? "is-on" : ""} onClick={() => setExportType("schedule")}>Schedule</button>
             <button type="button" className={exportType === "draft" ? "is-on" : ""} onClick={() => setExportType("draft")}>Draft</button>
           </div>
-          <p className="field-hint">{exportType === "draft" ? "Lands in Postiz unscheduled so you can place it on the calendar there." : "Postiz publishes at this time."}</p>
+          <p className="field-hint">{exportType === "draft" ? "Lands in Postiz unscheduled, ready to place on the calendar there." : "A starting time — move it on the Postiz calendar any time before it goes out."}</p>
         </div>
         <div>
           <p className="field-hint">Connected Postiz channels</p>
@@ -220,6 +257,7 @@ export function PostizBulkScheduler({ posts }: { posts: WorkspacePost[] }) {
             const blocked = preflight?.blockedChannels.find((entry) => entry.integrationId === integration.id);
             return <label className={`postiz-channel${blocked ? " pf-channel-blocked" : ""}`} key={integration.id} title={blocked?.reason}>
               <input type="checkbox" checked={selectedChannels.includes(integration.id)} onChange={() => toggleChannel(integration.id)} />
+              <BrandIcon identifier={integration.identifier} size={16} className="postiz-channel-icon" />
               <span>{integration.name}{blocked ? <em className="pf-channel-reason">{blocked.reason}</em> : null}</span>
               <small>{integration.profile || integration.identifier}</small>
             </label>;
@@ -244,6 +282,9 @@ export function PostizBulkScheduler({ posts }: { posts: WorkspacePost[] }) {
     <div className="bulk-post-list">{livePosts.map((post) => {
       const check = preflightByPost.get(post.id);
       const blocks = check?.issues.filter((issue) => issue.level === "block") ?? [];
+      // Tightest platform cap among the selected channels this post breaks.
+      const overLimit = blocks.filter((issue) => issue.code === "too_long" && issue.limit).sort((a, b) => a.limit! - b.limit!)[0];
+      const draftLength = editingId === post.id ? composePostContent({ caption: draftCaption, hashtags: post.hashtags }).length : 0;
       return <article className={`card bulk-post-card ${selectedPosts.includes(post.id) ? "selected" : ""}`} key={post.id}>
         <label className="bulk-post-select">
           <input type="checkbox" checked={selectedPosts.includes(post.id)} onChange={() => togglePost(post.id)} aria-label={`Select ${post.articleTitle}`} />
@@ -258,6 +299,19 @@ export function PostizBulkScheduler({ posts }: { posts: WorkspacePost[] }) {
           <p className="hashtags">{post.hashtags.join(" ")}</p>
           {postBadge(post)}
           {blocks.map((issue, index) => <span className="pf-badge pf-bad" key={index}>{issue.message}</span>)}
+          {overLimit ? <div className="pf-trim">
+            <button type="button" className="outline" onClick={() => openCaptionEditor(post)} disabled={savingCaption}>{editingId === post.id ? "Cancel" : "Shorten caption"}</button>
+            {editingId === post.id ? <>
+              <textarea value={draftCaption} onChange={(event) => setDraftCaption(event.target.value)} rows={4} aria-label="Caption" />
+              <div className="pf-trim-foot">
+                <span className={draftLength > overLimit.limit! ? "pf-over" : "pf-under"}>
+                  {draftLength} / {overLimit.limit}{draftLength > overLimit.limit! ? ` · ${draftLength - overLimit.limit!} over` : " · fits"}
+                </span>
+                <span className="field-hint">Hashtags count toward the limit.</span>
+                <button type="button" onClick={() => saveCaption(post.id)} disabled={savingCaption || !draftCaption.trim()}>{savingCaption ? <Spinner label="Saving…" /> : "Save caption"}</button>
+              </div>
+            </> : null}
+          </div> : null}
           <div className="bulk-post-actions">
             <a className="button outline" href={`/review?id=${post.id}`}>Open in review ↗</a>
             <button type="button" className="outline" onClick={() => openSendBack(post.id)} disabled={sendingBack}>{sendBackId === post.id ? "Cancel" : "Send back for review or edit"}</button>

@@ -7,6 +7,12 @@
  * docs.postiz.com/public-api/providers/*.
  */
 export type ProviderRule = {
+  /**
+   * The platform's own name. Limits belong to the platform, not to whatever
+   * the account happens to be nicknamed, so messages say "X allows 280"
+   * rather than naming the reviewer's own handle back at them.
+   */
+  label?: string;
   /** Extra settings we can safely supply ourselves, merged over `__type`. */
   defaults?: Record<string, unknown>;
   /** Max characters the platform accepts for post text. */
@@ -21,30 +27,30 @@ export type ProviderRule = {
 
 const rules: Record<string, ProviderRule> = {
   // Text + image platforms we can fully satisfy.
-  x: { defaults: { who_can_reply_post: "everyone" }, limit: 280 },
-  facebook: { limit: 63_206 },
-  instagram: { defaults: { post_type: "post" }, limit: 2_200 },
-  "instagram-standalone": { defaults: { post_type: "post" }, limit: 2_200 },
-  linkedin: { limit: 3_000 },
-  "linkedin-page": { limit: 3_000 },
-  threads: { limit: 500 },
-  mastodon: { limit: 500 },
-  bluesky: { limit: 300 },
-  telegram: { limit: 4_096 },
-  slack: { limit: 3_000 },
-  warpcast: { limit: 320 },
-  farcaster: { limit: 320 },
-  mattermost: { limit: 16_383 },
-  mattermost_provider: { limit: 16_383 },
+  x: { label: "X", defaults: { who_can_reply_post: "everyone" }, limit: 280 },
+  facebook: { label: "Facebook", limit: 63_206 },
+  instagram: { label: "Instagram", defaults: { post_type: "post" }, limit: 2_200 },
+  "instagram-standalone": { label: "Instagram", defaults: { post_type: "post" }, limit: 2_200 },
+  linkedin: { label: "LinkedIn", limit: 3_000 },
+  "linkedin-page": { label: "LinkedIn page", limit: 3_000 },
+  threads: { label: "Threads", limit: 500 },
+  mastodon: { label: "Mastodon", limit: 500 },
+  bluesky: { label: "Bluesky", limit: 300 },
+  telegram: { label: "Telegram", limit: 4_096 },
+  slack: { label: "Slack", limit: 3_000 },
+  warpcast: { label: "Warpcast", limit: 320 },
+  farcaster: { label: "Farcaster", limit: 320 },
+  mattermost: { label: "Mattermost", limit: 16_383 },
+  mattermost_provider: { label: "Mattermost", limit: 16_383 },
 
   // Video platforms: the branded template renders a 4:5 PNG, not a video.
-  youtube: { unsupported: "YouTube needs a video upload and a title. Post it from Postiz directly." },
-  tiktok: { unsupported: "TikTok needs a video upload. Post it from Postiz directly." },
+  youtube: { label: "YouTube", unsupported: "YouTube needs a video upload and a title. Post it from Postiz directly." },
+  tiktok: { label: "TikTok", unsupported: "TikTok needs a video upload. Post it from Postiz directly." },
 
   // Require an account-specific target we have no way to look up from here.
-  pinterest: { unsupported: "Pinterest needs a board ID. Post it from Postiz directly." },
-  reddit: { unsupported: "Reddit needs a subreddit and post title. Post it from Postiz directly." },
-  discord: { unsupported: "Discord needs a channel ID. Post it from Postiz directly." }
+  pinterest: { label: "Pinterest", unsupported: "Pinterest needs a board ID. Post it from Postiz directly." },
+  reddit: { label: "Reddit", unsupported: "Reddit needs a subreddit and post title. Post it from Postiz directly." },
+  discord: { label: "Discord", unsupported: "Discord needs a channel ID. Post it from Postiz directly." }
 };
 
 export function providerRule(identifier: string): ProviderRule {
@@ -64,4 +70,9 @@ export function providerLimit(identifier: string): number | undefined {
 
 export function providerUnsupportedReason(identifier: string): string | undefined {
   return providerRule(identifier).unsupported;
+}
+
+/** Platform name for reviewer-facing copy, falling back to the raw identifier. */
+export function providerLabel(identifier: string): string {
+  return providerRule(identifier).label ?? identifier;
 }

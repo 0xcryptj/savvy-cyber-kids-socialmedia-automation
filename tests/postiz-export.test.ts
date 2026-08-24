@@ -57,6 +57,9 @@ function handler(request: http.IncomingMessage, response: http.ServerResponse) {
 beforeAll(async () => {
   scratch = await mkdtemp(path.join(tmpdir(), "postiz-export-"));
   process.env.POSTIZ_LEDGER_PATH = path.join(scratch, "exports.json");
+  // Point settings at a scratch file too: a real saved apiUrl would otherwise
+  // win over the env var below and send these tests at the live API.
+  process.env.POSTIZ_SETTINGS_PATH = path.join(scratch, "settings.json");
   process.env.POSTIZ_API_KEY = "test-key";
   process.env.POSTIZ_CREATE_BUDGET = "50";
   await mkdir("storage/generated", { recursive: true });
@@ -71,6 +74,7 @@ afterAll(async () => {
   await rm(graphicPath, { force: true });
   await rm(scratch, { recursive: true, force: true });
   delete process.env.POSTIZ_LEDGER_PATH;
+  delete process.env.POSTIZ_SETTINGS_PATH;
   delete process.env.POSTIZ_API_KEY;
   delete process.env.POSTIZ_API_URL;
   delete process.env.POSTIZ_CREATE_BUDGET;

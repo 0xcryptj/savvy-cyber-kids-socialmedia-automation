@@ -5,7 +5,11 @@ import { getStoredPostizCredential } from "./credentials";
 export type PostizTest = { status: "success" | "failed"; testedAt: string; reason?: string; channelCount?: number };
 export type PostizSettings = { apiUrl: string; apiKey: string; lastTest?: PostizTest };
 
-const filePath = path.join(process.cwd(), "storage/postiz-settings.json");
+/** Resolved per call so tests never read the operator's real saved settings. */
+function filePath(): string {
+  return process.env.POSTIZ_SETTINGS_PATH || path.join(process.cwd(), "storage/postiz-settings.json");
+}
+
 const defaultApiUrl = "https://api.postiz.com/public/v1";
 
 function normalizeApiUrl(value: string | undefined): string {
@@ -19,7 +23,7 @@ function normalizeApiUrl(value: string | undefined): string {
 }
 
 async function readStored(): Promise<Partial<Pick<PostizSettings, "apiUrl" | "lastTest">>> {
-  try { return JSON.parse(await readFile(filePath, "utf8")) as Partial<Pick<PostizSettings, "apiUrl" | "lastTest">>; }
+  try { return JSON.parse(await readFile(filePath(), "utf8")) as Partial<Pick<PostizSettings, "apiUrl" | "lastTest">>; }
   catch { return {}; }
 }
 
@@ -35,9 +39,10 @@ export async function getPostizSettings(): Promise<PostizSettings> {
 export async function savePostizSettings(input: { apiUrl?: string; lastTest?: PostizTest }): Promise<PostizSettings> {
   const current = await getPostizSettings();
   const next = { apiUrl: normalizeApiUrl(input.apiUrl || current.apiUrl), lastTest: input.lastTest || current.lastTest };
-  await mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 });
-  await writeFile(filePath, JSON.stringify(next, null, 2), { mode: 0o600 });
-  await chmod(filePath, 0o600);
+  const target = filePath();
+  await mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
+  await writeFile(target, JSON.stringify(next, null, 2), { mode: 0o600 });
+  await chmod(target, 0o600);
   return { ...next, apiKey: current.apiKey };
 }
 
