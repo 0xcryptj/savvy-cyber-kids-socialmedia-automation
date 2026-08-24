@@ -16,11 +16,56 @@ The dashboard uploads the rendered PNG directly to Postiz before creating the sc
 
 The integration uses the documented Postiz Public API:
 
-- `GET /integrations` to discover connected channels.
+- `GET /integrations` to discover connected channels, fetched once per batch.
 - `POST /upload` to upload the generated graphic.
-- `POST /posts` with `type: "schedule"` to create one scheduled post for multiple integrations.
+- `POST /posts` with `type: "schedule"` (or `"draft"`) to create one post covering every selected channel.
 
-Provider-specific settings are kept minimal and use the channel identifier returned by Postiz. Instagram channels receive `post_type: "post"`; X receives `who_can_reply_post: "everyone"`; other providers use their documented `__type` identifier and can be expanded as platform-specific needs arise.
+Scheduling and publishing belong to Postiz. This dashboard only guarantees the handoff.
+
+### How the export path is kept safe
+
+`src/integrations/postiz-client.ts` is the only place that talks to Postiz. It
+classifies every failure (`auth`, `rate_limit`, `validation`, `timeout`, ...),
+retries reads and uploads with jittered backoff, and honours `Retry-After`. It
+deliberately never retries a create: Postiz has no idempotency key, so a blind
+repeat is a duplicate on a real social account.
+
+`src/integrations/postiz-ledger.ts` is the memory that makes export repeatable.
+It stores, per post:
+
+- a **content fingerprint** (caption, hashtags, graphic, adjustments) so an
+  unchanged post is skipped and an edited one is sent again;
+- the **Postiz post id for every channel**, so a partial batch resumes on only
+  the channels that were missed;
+- the **uploaded media id**, so a retry or a caption-only edit reuses the image
+  already on Postiz instead of re-uploading it;
+- a rolling count of create calls, checked against `POSTIZ_CREATE_BUDGET`.
+
+A create that fails with a timeout or dropped connection is recorded as
+`uncertain`: nobody can know whether Postiz accepted it, so the queue asks the
+reviewer to check Postiz before re-sending rather than risking a duplicate.
+
+### Preflight
+
+`POST /api/postiz/preflight` runs every check the export would run, without
+sending anything: caption length against each platform's limit, missing
+captions or graphics, channels that disappeared from Postiz, content that
+already went out, and the remaining hourly create budget. The approved queue
+calls it as the selection changes, so problems appear in the dashboard rather
+than as a 400 halfway through a batch.
+
+Provider rules live in `src/integrations/postiz-providers.ts`, sourced from
+`docs.postiz.com/public-api/providers/*`. Platforms whose payload this dashboard
+cannot build - YouTube and TikTok need video, Pinterest needs a board, Reddit a
+subreddit, Discord a channel id - are excluded in preflight with a reason.
+Uncatalogued platforms stay permissive and post with a bare `__type`.
+
+### Failure handling
+
+A failed export leaves the post `APPROVED` and in **Ready to post**, with the
+reason shown on the card. The reviewer's judgement still stands, the cause is
+usually transient, and re-exporting is one click. Only successful exports move
+on to `QUEUED` / `SCHEDULED`.
 
 ## AI and Canva
 

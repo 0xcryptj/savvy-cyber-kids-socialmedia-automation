@@ -14,4 +14,6 @@ public/generated/*
 storage/workspace.json
 storage/settings.json
 storage/credentials.json
+storage/postiz-settings.json
+storage/postiz-exports.json
 npm-debug.log*

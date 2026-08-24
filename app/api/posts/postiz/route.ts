@@ -1,35 +1,69 @@
 import { NextRequest, NextResponse } from "next/server";
-import { transitionPost } from "@/src/workflow/approval";
 import { getPost } from "@/src/workspace/store";
 import { sameOrigin } from "@/src/lib/request-security";
-import { schedulePostizPost } from "@/src/integrations/postiz";
+import { PostizError, exportPostsToPostiz } from "@/src/integrations/postiz";
+import { listExportRecords } from "@/src/integrations/postiz-ledger";
+import { applyExportOutcomes } from "@/src/workflow/postiz-export";
+import { WorkspacePost } from "@/src/workspace/types";
+
+const exportTypes = new Set(["schedule", "now", "draft"]);
+
+function parseBody(body: unknown) {
+  if (!body || typeof body !== "object") return null;
+  const { postIds, integrationIds, date, type } = body as Record<string, unknown>;
+  if (!Array.isArray(postIds) || !postIds.length || postIds.length > 100 || !postIds.every((item) => typeof item === "string")) return null;
+  if (!Array.isArray(integrationIds) || !integrationIds.length || !integrationIds.every((item) => typeof item === "string")) return null;
+  if (typeof date !== "string") return null;
+  if (type !== undefined && (typeof type !== "string" || !exportTypes.has(type))) return null;
+  return { postIds: postIds as string[], integrationIds: integrationIds as string[], date, type: (type as "schedule" | "now" | "draft") ?? "schedule" };
+}
+
+/** Export status for the approved queue, so the UI can show what already went out. */
+export async function GET(request: NextRequest) {
+  const originError = sameOrigin(request);
+  if (originError) return originError;
+  const ids = request.nextUrl.searchParams.get("postIds");
+  const records = await listExportRecords(ids ? ids.split(",").filter(Boolean).slice(0, 200) : undefined);
+  return NextResponse.json({ records });
+}
 
 export async function POST(request: NextRequest) {
   const originError = sameOrigin(request);
   if (originError) return originError;
-  const body = await request.json().catch(() => null) as { postIds?: unknown; integrationIds?: unknown; date?: unknown } | null;
-  if (!body || !Array.isArray(body.postIds) || !body.postIds.length || body.postIds.length > 100 || !body.postIds.every((item) => typeof item === "string") || !Array.isArray(body.integrationIds) || !body.integrationIds.length || !body.integrationIds.every((item) => typeof item === "string") || typeof body.date !== "string") {
-    return NextResponse.json({ error: "Select posts, Postiz channels, and a schedule time" }, { status: 400 });
-  }
-  const scheduleDate = new Date(body.date);
-  if (Number.isNaN(scheduleDate.getTime()) || scheduleDate.getTime() <= Date.now()) return NextResponse.json({ error: "Choose a future schedule time" }, { status: 400 });
+  const parsed = parseBody(await request.json().catch(() => null));
+  if (!parsed) return NextResponse.json({ error: "Select posts, Postiz channels, and a schedule time" }, { status: 400 });
 
-  const scheduled: string[] = [];
-  const failed: Array<{ id: string; error: string }> = [];
-  for (const id of body.postIds) {
+  const scheduleDate = new Date(parsed.date);
+  if (Number.isNaN(scheduleDate.getTime())) return NextResponse.json({ error: "Choose a valid schedule time" }, { status: 400 });
+  // Postiz needs a date even for a draft, but only a real schedule has to be in
+  // the future.
+  if (parsed.type === "schedule" && scheduleDate.getTime() <= Date.now()) return NextResponse.json({ error: "Choose a future schedule time" }, { status: 400 });
+
+  const posts: WorkspacePost[] = [];
+  const rejected: Array<{ id: string; error: string }> = [];
+  for (const id of parsed.postIds) {
     const post = await getPost(id);
-    if (!post) { failed.push({ id, error: "Post not found" }); continue; }
-    if (post.status !== "APPROVED") { failed.push({ id, error: "Only approved posts can be scheduled" }); continue; }
-    try {
-      const result = await schedulePostizPost({ post, integrationIds: body.integrationIds, date: scheduleDate.toISOString() });
-      await transitionPost(id, "QUEUED", { publishedVia: "Postiz" });
-      await transitionPost(id, "SCHEDULED", { publishedVia: "Postiz", publishExternalId: result[0]?.postId, scheduledAt: scheduleDate.toISOString() });
-      scheduled.push(id);
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : "Scheduling failed";
-      await transitionPost(id, "FAILED", { failureReason: reason });
-      failed.push({ id, error: reason });
-    }
+    if (!post) rejected.push({ id, error: "Post not found" });
+    else if (post.status !== "APPROVED") rejected.push({ id, error: "Only approved posts can be exported" });
+    else posts.push(post);
   }
-  return NextResponse.json({ scheduled, failed }, { status: failed.length && !scheduled.length ? 400 : 200 });
+  if (!posts.length) return NextResponse.json({ error: rejected[0]?.error ?? "Nothing to export", rejected }, { status: 400 });
+
+  try {
+    const summary = await exportPostsToPostiz({ posts, integrationIds: parsed.integrationIds, date: scheduleDate.toISOString(), type: parsed.type });
+    await applyExportOutcomes(summary, { date: scheduleDate.toISOString(), type: parsed.type });
+    const blocking = summary.preflight.issues.find((issue) => issue.level === "block");
+    return NextResponse.json({
+      exported: summary.exported,
+      skipped: summary.skipped,
+      failed: summary.failed,
+      outcomes: summary.outcomes,
+      preflight: summary.preflight,
+      rejected,
+      ...(summary.preflight.ok ? {} : { error: blocking?.message ?? "Export did not pass preflight checks" })
+    }, { status: summary.preflight.ok ? 200 : 400 });
+  } catch (error) {
+    const failure = error instanceof PostizError ? error : null;
+    return NextResponse.json({ error: failure?.reviewerMessage ?? (error instanceof Error ? error.message : "Export failed") }, { status: failure?.kind === "auth" ? 401 : 502 });
+  }
 }
