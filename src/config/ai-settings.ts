@@ -1,11 +1,9 @@
-import { mkdir, readFile, writeFile } from "fs/promises";
-import path from "path";
+import { documents } from "@/src/storage";
 import { getStoredCredential } from "./credentials";
 
 export type AIProvider = "openai" | "anthropic" | "openai-compatible";
 export type AISettings = { provider: AIProvider; model: string; baseUrl?: string };
 
-const filePath = path.join(process.cwd(), "storage/settings.json");
 const defaults: AISettings = {
   provider: (process.env.AI_PROVIDER as AIProvider) || (process.env.ANTHROPIC_API_KEY ? "anthropic" : "openai"),
   model: process.env.AI_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini",
@@ -13,8 +11,7 @@ const defaults: AISettings = {
 };
 
 export async function getAISettings(): Promise<AISettings> {
-  try { return { ...defaults, ...(JSON.parse(await readFile(filePath, "utf8")) as Partial<AISettings>) }; }
-  catch { return defaults; }
+  return { ...defaults, ...(await documents.read<Partial<AISettings>>("settings")) };
 }
 
 export async function saveAISettings(input: Partial<AISettings>): Promise<AISettings> {
@@ -25,8 +22,7 @@ export async function saveAISettings(input: Partial<AISettings>): Promise<AISett
     model: candidateModel && /^[A-Za-z0-9._:/-]+$/.test(candidateModel) ? candidateModel : current.model,
     baseUrl: normalizeBaseUrl(input.baseUrl, current.baseUrl)
   };
-  await mkdir(path.dirname(filePath), { recursive: true });
-  await writeFile(filePath, JSON.stringify(next, null, 2));
+  await documents.write("settings", next);
   return next;
 }
 
