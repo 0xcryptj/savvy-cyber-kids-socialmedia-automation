@@ -38,12 +38,12 @@ export function listingLinks(html: string, category: ContentCategory): ListingLi
   return links;
 }
 
-export async function scrapeSourcePage(category: ContentCategory): Promise<SourceArticle[]> {
-  const html = await fetchText(feedConfig[category].pageUrl, 900);
+export async function scrapeSourcePage(category: ContentCategory, noStore = false): Promise<SourceArticle[]> {
+  const html = await fetchText(feedConfig[category].pageUrl, 900, noStore);
   const links = listingLinks(html, category).slice(0, feedConfig[category].perPage);
   return Promise.all(links.map(async ({ title, url }, index) => {
     let metadata: OpenGraphMetadata = {};
-    try { metadata = extractOpenGraph(await fetchText(url, 900)); } catch { /* keep the listing title */ }
+    try { metadata = extractOpenGraph(await fetchText(url, 900, noStore)); } catch { /* keep the listing title */ }
     const description = metadata.description ? decodeHtml(htmlToText(metadata.description)) : "";
     return {
       id: `${category}_scrape_${index}_${Buffer.from(url).toString("base64url").slice(0, 10)}`,

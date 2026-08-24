@@ -16,4 +16,6 @@ storage/settings.json
 storage/credentials.json
 storage/postiz-settings.json
 storage/postiz-exports.json
+storage/source-cache.json
+storage/pipeline.json
 npm-debug.log*

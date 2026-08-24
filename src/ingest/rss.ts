@@ -37,8 +37,8 @@ export function parseRssItems(xml: string): RssItem[] {
   })).filter((item) => item.link);
 }
 
-export async function discoverFeedItems(feedUrl: string = feedConfig.blog.rssUrl): Promise<RssItem[]> {
-  const xml = await fetchText(feedUrl, 900);
+export async function discoverFeedItems(feedUrl: string = feedConfig.blog.rssUrl, noStore = false): Promise<RssItem[]> {
+  const xml = await fetchText(feedUrl, 900, noStore);
   return parseRssItems(xml).map((item) => ({
     ...item,
     imageUrl: item.imageUrl ? safeAbsoluteUrl(item.imageUrl, feedUrl) : undefined
