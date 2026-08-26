@@ -1,5 +1,5 @@
 import "./globals.css";
-import { SidebarNav } from "./components/SidebarNav";
+import { Sidebar } from "./components/Sidebar";
 import { AutoPipeline } from "./components/AutoPipeline";
 import { ServerLifecycle } from "./components/ServerLifecycle";
 import type { ReactNode } from "react";
@@ -18,19 +18,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <body>
         <ServerLifecycle enabled={Boolean(process.env.SCK_SHUTDOWN_TOKEN)} />
         <AutoPipeline />
-        <aside>
-          <div className="brand">
-            <img className="brand-logo" src="/branding/sck-logo-150.png" alt="Savvy Cyber Kids" />
-            <span>savvy<br /><b>cyber kids</b></span>
-          </div>
-          <p className="eyebrow">SOCIAL CONTROL ROOM</p>
-          <SidebarNav />
-          <div className="sidebar-foot">
-            <span className={`live-dot ${feedsHealthy ? "" : "live-dot-error"}`} /> {feedsHealthy ? "Live feeds connected" : "Feed issue — check Library"}
-            <br /><small>{pipelineText}</small>
-            <br /><small>Human review required</small>
-          </div>
-        </aside>
+        <Sidebar feedsHealthy={feedsHealthy} pipelineText={pipelineText} />
         <main>
           <header>
             <div>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Spinner } from "@/app/components/Spinner";
+import { SuccessToast } from "@/app/components/SuccessToast";
 import { WorkspacePost } from "@/src/workspace/types";
 import { composePostContent } from "@/src/content/post-text";
 import { fitCaption } from "@/src/content/caption-limits";
@@ -76,6 +77,7 @@ export function PostizBulkScheduler({ posts }: { posts: WorkspacePost[] }) {
   const [savingCaption, setSavingCaption] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [channelError, setChannelError] = useState<string | null>(null);
 
@@ -281,6 +283,7 @@ export function PostizBulkScheduler({ posts }: { posts: WorkspacePost[] }) {
       if (exported.length) {
         setLivePosts((current) => current.filter((post) => !exported.includes(post.id)));
         setSelectedPosts((current) => current.filter((id) => !exported.includes(id)));
+        setToast(`${exported.length} post${exported.length === 1 ? "" : "s"} ${exportType === "draft" ? "sent to Postiz" : "scheduled in Postiz"}`);
       }
       // Budget, duplicate warnings and ledger state all moved; re-check so a
       // follow-up attempt is judged on what Postiz holds now.
@@ -464,5 +467,6 @@ export function PostizBulkScheduler({ posts }: { posts: WorkspacePost[] }) {
         </div>
       </article>;
     })}</div>
+    {toast ? <SuccessToast message={toast} onDone={() => setToast(null)} /> : null}
   </>;
 }

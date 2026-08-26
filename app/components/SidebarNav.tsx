@@ -12,16 +12,17 @@ export function SidebarNav() {
   return (
     <nav>
       {pipelineNav.map(([href, label, Icon]) => (
-        <Link key={href} href={href} className={pathname === href ? "active" : undefined}>
+        <Link key={href} href={href} title={label} className={pathname === href ? "active" : undefined}>
           <span className="nav-icon"><Icon size={17} strokeWidth={1.8} aria-hidden="true" /></span>
-          {label}
+          <span className="label-fade">{label}</span>
         </Link>
       ))}
-      <p className="eyebrow nav-section-label">WORKSPACE</p>
+      <div className="nav-divider" />
+      <p className="eyebrow nav-section-label label-fade">WORKSPACE</p>
       {workspaceNav.map(([href, label, Icon]) => (
-        <Link key={href} href={href} className={pathname === href ? "active" : undefined}>
+        <Link key={href} href={href} title={label} className={pathname === href ? "active" : undefined}>
           <span className="nav-icon"><Icon size={17} strokeWidth={1.8} aria-hidden="true" /></span>
-          {label}
+          <span className="label-fade">{label}</span>
         </Link>
       ))}
     </nav>
