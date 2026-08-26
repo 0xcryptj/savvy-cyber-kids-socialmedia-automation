@@ -74,15 +74,20 @@ export default function ReviewPage() {
   async function transition(status: WorkspacePost["status"]) {
     if (!post) return;
     setTransitioning(true); setError(null);
-    const lines = copy.trim().split(/\r?\n/);
-    const hashtagLine = lines.at(-1) || "";
-    const hashtags = hashtagLine.split(/\s+/).filter(Boolean);
-    const caption = lines.slice(0, -1).join("\n").trim();
-    const response = await fetch(`/api/posts/${post.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status, caption, hashtags, feedbackNote }) });
-    const payload = await response.json();
-    if (!response.ok) setError(payload.error);
-    else { setPost(payload); setCopy(`${payload.caption}\n\n${payload.hashtags.join(" ")}`); setReviewQueue(current => status === "APPROVED" || status === "REJECTED" ? current.filter(item => item.id !== payload.id) : current.map(item => item.id === payload.id ? payload : item)); }
-    setTransitioning(false);
+    try {
+      const lines = copy.trim().split(/\r?\n/);
+      const hashtagLine = lines.at(-1) || "";
+      const hashtags = hashtagLine.split(/\s+/).filter(Boolean);
+      const caption = lines.slice(0, -1).join("\n").trim();
+      const response = await fetch(`/api/posts/${post.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status, caption, hashtags, feedbackNote }) });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Could not save this post");
+      setPost(payload); setCopy(`${payload.caption}\n\n${payload.hashtags.join(" ")}`); setReviewQueue(current => status === "APPROVED" || status === "REJECTED" ? current.filter(item => item.id !== payload.id) : current.map(item => item.id === payload.id ? payload : item));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save this post");
+    } finally {
+      setTransitioning(false);
+    }
   }
 
   async function regenerate() {

@@ -49,15 +49,31 @@ async function renderGraphic(post: WorkspacePost): Promise<Uint8Array<ArrayBuffe
   return new Uint8Array(await rendered.arrayBuffer());
 }
 
+/**
+ * Postiz's own upload endpoint takes far longer, and times out far more
+ * often, as the file grows: an untouched ~2.3MB RGBA PNG straight out of
+ * Satori/resvg regularly took 30-115s there (measured directly against
+ * their API, independent of anything on our side), while the same graphic
+ * flattened and re-encoded as an ~85%-quality JPEG - a few hundred KB -
+ * uploaded in a few seconds. The template graphic has no transparency to
+ * preserve, so there is no quality reason to ship the heavier format.
+ */
+async function compressForUpload(graphic: Uint8Array): Promise<Uint8Array<ArrayBuffer>> {
+  const sharp = (await import("sharp")).default;
+  const jpeg = await sharp(graphic).flatten({ background: "#ffffff" }).jpeg({ quality: 85, mozjpeg: true }).toBuffer();
+  // A Node Buffer is not structurally a BlobPart; copy into a plain array.
+  return Uint8Array.from(jpeg);
+}
+
 /** Uploads the graphic once per distinct render and reuses it on every retry. */
 async function uploadGraphic(post: WorkspacePost, options: { fresh?: boolean } = {}): Promise<PostizUpload> {
   const fingerprint = graphicFingerprint(post);
   const cached = options.fresh ? undefined : await findMedia(fingerprint);
   if (cached) return { id: cached.id, path: cached.path, cached: true };
 
-  const graphic = await renderGraphic(post);
+  const graphic = await compressForUpload(await renderGraphic(post));
   const form = new FormData();
-  form.append("file", new Blob([graphic], { type: "image/png" }), `${post.id}.png`);
+  form.append("file", new Blob([graphic], { type: "image/jpeg" }), `${post.id}.jpg`);
   // Safe to retry: an upload Postiz never gets referenced is inert.
   const response = await postizFetch("/upload", { method: "POST", form, timeoutMs: 60_000, retry: true });
   const payload = await response.json().catch(() => null) as PostizUpload | null;

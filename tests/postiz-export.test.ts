@@ -63,7 +63,9 @@ beforeAll(async () => {
   process.env.POSTIZ_API_KEY = "test-key";
   process.env.POSTIZ_CREATE_BUDGET = "50";
   await mkdir("storage/generated", { recursive: true });
-  await writeFile(graphicPath, Buffer.from("89504e470d0a1a0a0000000d49484452", "hex"));
+  // A real (if tiny) PNG: exportPostsToPostiz now re-encodes the graphic
+  // through sharp before upload, which a bare signature stub can't survive.
+  await writeFile(graphicPath, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADklEQVQImWP4DwYMEAoAU7oL9W/sIDEAAAAASUVORK5CYII=", "base64"));
   server = http.createServer(handler);
   await new Promise<void>((resolve) => server.listen(0, resolve));
   process.env.POSTIZ_API_URL = `http://localhost:${(server.address() as { port: number }).port}/public/v1`;
