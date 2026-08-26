@@ -2,6 +2,7 @@ import { contentRules } from "@/config/content-rules";
 import { SourceArticle } from "@/src/ingest/types";
 import { GeneratedSocialPost } from "./schema";
 import { firstSentences } from "@/src/ingest/html";
+import { captionBudget, fitCaption } from "./caption-limits";
 
 const skipTags = new Set(["student submissions", "educator", "guest blogger"]);
 const topicFromTag: Record<string, string> = {
@@ -56,21 +57,27 @@ export function hashtagsFromArticle(article: Pick<SourceArticle, "title" | "tags
   return [filled[0], filled[1]];
 }
 
-export function captionFromArticle(article: SourceArticle): string {
-  const excerpt = firstSentences(article.body || article.excerpt || article.title, 2, 380);
+/**
+ * The offline caption, written to the same platform limit as the model's.
+ * The excerpt is cut to whatever the link and the closing line leave behind, so
+ * the fallback produces a postable caption rather than one the reviewer has to
+ * trim before it can go anywhere.
+ */
+export function captionFromArticle(article: SourceArticle, hashtags: string[] = [...contentRules.hashtags.required]): string {
   const link = article.externalUrl || article.sourceUrl;
-  if (article.category === "news") {
-    return `${excerpt} This headline is worth a family conversation about staying savvy online. Read more: ${link}`;
-  }
-  return `${excerpt} Read the full Savvy Cyber Kids article: ${link}`;
+  const closing = article.category === "news" ? "Worth a family conversation. Read more:" : "Read the full article:";
+  const room = captionBudget(hashtags) - closing.length - link.length - 2;
+  const excerpt = firstSentences(article.body || article.excerpt || article.title, 2, Math.max(40, room));
+  return fitCaption(`${excerpt} ${closing} ${link}`, hashtags);
 }
 
 export function createLocalPost(article: SourceArticle): GeneratedSocialPost {
+  const hashtags = hashtagsFromArticle(article);
   return {
     topic_heading: topicHeadingFromArticle(article),
     article_title: article.title,
-    caption: captionFromArticle(article),
-    hashtags: hashtagsFromArticle(article)
+    caption: captionFromArticle(article, [...hashtags, ...contentRules.hashtags.required]),
+    hashtags
   };
 }
 

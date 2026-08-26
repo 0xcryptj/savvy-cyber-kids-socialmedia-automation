@@ -92,3 +92,21 @@ export function safePostizSettings(settings: PostizSettings) {
     lastTest: settings.lastTest
   };
 }
+
+/**
+ * Where a human opens Postiz, derived from the API URL already configured.
+ *
+ * The dashboard hands posts over and then gets out of the way, so it has to be
+ * able to point at the calendar the reviewer just sent work to. Asking for a
+ * second URL in Settings would be one more thing to get wrong, and the API URL
+ * already names the deployment: the cloud API is fronted by platform.postiz.com,
+ * and a self-hosted API sits on the same origin as the app it belongs to.
+ */
+export function postizAppUrl(apiUrl: string): string | undefined {
+  try {
+    const url = new URL(apiUrl);
+    if (url.hostname === "api.postiz.com") return "https://platform.postiz.com";
+    const path = url.pathname.replace(/\/+$/, "").replace(/\/public\/v\d+$/, "").replace(/\/api$/, "");
+    return `${url.origin}${path}`;
+  } catch { return undefined; }
+}

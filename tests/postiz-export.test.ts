@@ -146,11 +146,24 @@ describe("exporting to postiz", () => {
     expect(summary.outcomes[1].retryable).toBe(true);
   });
 
-  it("surfaces a rejected payload without retrying it", async () => {
+  it("surfaces a rejected payload without retrying a graphic it just uploaded", async () => {
     failNextCreate = 400;
-    const summary = await exportPostsToPostiz({ posts: [post({ id: "bad", caption: "Bad" })], integrationIds: ["fb"], date: future() });
+    const uploadsBefore = counts.uploads;
+    const summary = await exportPostsToPostiz({ posts: [post({ id: "bad", topicHeading: "FRESHLY RENDERED", caption: "Bad" })], integrationIds: ["fb"], date: future() });
     expect(summary.failed).toEqual(["bad"]);
     expect(summary.outcomes[0].retryable).toBe(false);
-    expect(counts.creates).toBeGreaterThan(0);
+    expect(counts.uploads).toBe(uploadsBefore + 1);
+  });
+
+  it("re-uploads and retries once when the rejected payload reused a cached graphic", async () => {
+    // The media cache is keyed on the graphic alone, so a reference Postiz no
+    // longer accepts would otherwise survive every caption edit and make the
+    // post permanently unexportable.
+    await exportPostsToPostiz({ posts: [post({ id: "reuse_a", topicHeading: "REUSED GRAPHIC" })], integrationIds: ["fb"], date: future() });
+    const uploadsBefore = counts.uploads;
+    failNextCreate = 400;
+    const summary = await exportPostsToPostiz({ posts: [post({ id: "reuse_b", topicHeading: "REUSED GRAPHIC", caption: "Different words." })], integrationIds: ["fb"], date: future() });
+    expect(summary.exported).toEqual(["reuse_b"]);
+    expect(counts.uploads).toBe(uploadsBefore + 1);
   });
 });

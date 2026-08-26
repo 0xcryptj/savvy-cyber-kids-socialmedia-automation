@@ -130,6 +130,19 @@ export async function findMedia(fingerprint: string): Promise<MediaRecord | unde
   return (await readLedger()).media.find((entry) => entry.fingerprint === fingerprint);
 }
 
+/**
+ * Drops a cached upload Postiz will no longer accept.
+ *
+ * The media cache is keyed on the graphic alone, so a reference that has gone
+ * stale on Postiz's side outlives every caption edit: without this, one bad
+ * cache entry makes a post permanently unexportable and the reviewer sees the
+ * same rejection no matter what they change.
+ */
+export async function forgetMedia(fingerprint: string): Promise<void> {
+  const state = await readLedger();
+  await writeLedger({ ...state, media: state.media.filter((entry) => entry.fingerprint !== fingerprint) });
+}
+
 export async function recordMedia(fingerprint: string, media: { id: string; path: string }): Promise<void> {
   const state = await readLedger();
   const media_ = state.media.filter((entry) => entry.fingerprint !== fingerprint);

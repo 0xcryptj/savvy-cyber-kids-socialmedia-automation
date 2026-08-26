@@ -1,5 +1,6 @@
 import { contentRules } from "@/config/content-rules";
 import { FinalSocialPost, GeneratedSocialPost, finalSocialPostSchema, generatedSocialPostSchema } from "./schema";
+import { fitCaption } from "./caption-limits";
 
 const emojiPattern = /[\p{Extended_Pictographic}\uFE0F]/gu;
 
@@ -16,8 +17,19 @@ export function validateGeneratedPost(input: unknown, originalTitle: string): Ge
   return parsed;
 }
 
+/**
+ * The last step before a post enters review, and the only place the platform
+ * limit can be enforced against the real hashtags. The prompt asks the model to
+ * write short; this guarantees it, so a reviewer never opens the queue to copy
+ * that X would reject.
+ */
 export function buildFinalPost(input: GeneratedSocialPost): FinalSocialPost {
-  return finalSocialPostSchema.parse({ ...input, caption: removeCaptionEmojis(input.caption), hashtags: [...input.hashtags, ...contentRules.hashtags.required] });
+  const hashtags = [...input.hashtags, ...contentRules.hashtags.required];
+  return finalSocialPostSchema.parse({
+    ...input,
+    caption: fitCaption(removeCaptionEmojis(input.caption), hashtags),
+    hashtags
+  });
 }
 
 export function validateEditableHashtags(input: unknown): string[] {

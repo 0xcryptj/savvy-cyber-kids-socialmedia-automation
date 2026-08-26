@@ -48,3 +48,5 @@ h1,h2,h3{font-family:Asap,Arial,sans-serif;font-weight:600}
 .pf-trim{display:grid;gap:9px;margin-top:10px}.pf-trim>button{justify-self:start;font-size:12px;padding:8px 12px}.pf-trim textarea{font:inherit;width:100%;border:1px solid var(--line);border-radius:6px;padding:10px;background:#fffdf8;color:var(--ink);line-height:1.5;resize:vertical}.pf-trim-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.pf-trim-foot .field-hint{margin:0;flex:1;min-width:120px}.pf-trim-foot button{font-size:12px;padding:8px 12px}.pf-over{color:#b14e42;font-size:12px;font-weight:800;font-variant-numeric:tabular-nums}.pf-under{color:#2c6f61;font-size:12px;font-weight:800;font-variant-numeric:tabular-nums}
 
 .eyebrow-brand{display:inline-flex;align-items:center;gap:6px}.eyebrow-brand svg{flex:0 0 auto}.postiz-channel{grid-template-columns:18px 16px 1fr auto}.postiz-channel-icon{flex:0 0 auto;align-self:center}
+
+.pf-limit-note{margin:9px 0 0;line-height:1.5}.pf-postiz-link{color:inherit;font-weight:800;text-decoration:underline;white-space:nowrap}.bulk-post-meta .pf-over,.bulk-post-meta .pf-under{font-size:inherit;letter-spacing:inherit}

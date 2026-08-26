@@ -11,6 +11,7 @@ import {
   alreadyExported,
   contentFingerprint,
   findMedia,
+  forgetMedia,
   getExportRecord,
   pendingIntegrations,
   recordCreate,
@@ -21,7 +22,7 @@ import {
 export type { PostizIntegration } from "./postiz-client-types";
 export { PostizError } from "./postiz-client";
 
-type PostizUpload = { id: string; path: string };
+type PostizUpload = { id: string; path: string; cached: boolean };
 type PostizCreateResponse = { postId?: string; integration?: string }[];
 
 export async function listPostizIntegrations(): Promise<PostizIntegration[]> {
@@ -49,10 +50,10 @@ async function renderGraphic(post: WorkspacePost): Promise<Uint8Array<ArrayBuffe
 }
 
 /** Uploads the graphic once per distinct render and reuses it on every retry. */
-async function uploadGraphic(post: WorkspacePost): Promise<PostizUpload> {
+async function uploadGraphic(post: WorkspacePost, options: { fresh?: boolean } = {}): Promise<PostizUpload> {
   const fingerprint = graphicFingerprint(post);
-  const cached = await findMedia(fingerprint);
-  if (cached) return { id: cached.id, path: cached.path };
+  const cached = options.fresh ? undefined : await findMedia(fingerprint);
+  if (cached) return { id: cached.id, path: cached.path, cached: true };
 
   const graphic = await renderGraphic(post);
   const form = new FormData();
@@ -62,7 +63,7 @@ async function uploadGraphic(post: WorkspacePost): Promise<PostizUpload> {
   const payload = await response.json().catch(() => null) as PostizUpload | null;
   if (!payload?.id || !payload?.path) throw new PostizError("server", "Postiz accepted the upload but returned no media reference");
   await recordMedia(fingerprint, payload);
-  return { id: payload.id, path: payload.path };
+  return { id: payload.id, path: payload.path, cached: false };
 }
 
 export type ExportOutcome = {
@@ -142,11 +143,8 @@ export async function exportPostsToPostiz(input: ExportInput): Promise<ExportSum
 
     const channels = usable.filter((integration) => targets.includes(integration.id));
     try {
-      const upload = await uploadGraphic(post);
       const content = composePostContent(post);
-      // Creates are never retried automatically: without an idempotency key on
-      // Postiz's side, a blind repeat is a duplicate on a real account.
-      const created = await postizJson<PostizCreateResponse>("/posts", {
+      const createPost = async (upload: PostizUpload) => postizJson<PostizCreateResponse>("/posts", {
         method: "POST",
         timeoutMs: 45_000,
         json: {
@@ -161,6 +159,23 @@ export async function exportPostsToPostiz(input: ExportInput): Promise<ExportSum
           }))
         }
       });
+
+      // Creates are never retried automatically: without an idempotency key on
+      // Postiz's side, a blind repeat is a duplicate on a real account.
+      const upload = await uploadGraphic(post);
+      let created: PostizCreateResponse;
+      try {
+        created = await createPost(upload);
+      } catch (error) {
+        // The one safe exception: Postiz rejected the payload outright, so
+        // nothing was created. A reused upload it no longer recognises is the
+        // usual cause, and because the media cache is keyed on the graphic
+        // alone that rejection would otherwise outlive every caption edit.
+        const rejected = error instanceof PostizError && (error.kind === "validation" || error.kind === "not_found");
+        if (!rejected || !upload.cached) throw error;
+        await forgetMedia(graphicFingerprint(post));
+        created = await createPost(await uploadGraphic(post, { fresh: true }));
+      }
       await recordCreate();
 
       const results: PostizChannelResult[] = channels.map((integration, index) => ({

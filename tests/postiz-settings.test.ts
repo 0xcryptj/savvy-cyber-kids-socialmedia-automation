@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtemp, readFile, rm } from "fs/promises";
 import { tmpdir } from "os";
 import path from "path";
-import { getPostizSettings, savePostizSettings } from "@/src/config/postiz-settings";
+import { getPostizSettings, postizAppUrl, savePostizSettings } from "@/src/config/postiz-settings";
 
 /**
  * The bug these cover: savePostizSettings used to write back the *resolved*
@@ -107,5 +107,24 @@ describe("saving postiz settings", () => {
   it("ignores a malformed url instead of storing it", async () => {
     await savePostizSettings({ apiUrl: "not a url" });
     expect(await stored()).not.toHaveProperty("apiUrl");
+  });
+});
+
+describe("the app url behind the api url", () => {
+  it("points the cloud api at the app humans actually open", () => {
+    expect(postizAppUrl("https://api.postiz.com/public/v1")).toBe("https://platform.postiz.com");
+  });
+
+  it("keeps a self-hosted deployment on its own origin", () => {
+    expect(postizAppUrl("http://localhost:5000/api/public/v1")).toBe("http://localhost:5000");
+    expect(postizAppUrl("https://social.example.com/public/v1")).toBe("https://social.example.com");
+  });
+
+  it("keeps a path prefix a reverse proxy added", () => {
+    expect(postizAppUrl("https://example.com/postiz/api/public/v1")).toBe("https://example.com/postiz");
+  });
+
+  it("returns nothing rather than a broken link", () => {
+    expect(postizAppUrl("not a url")).toBeUndefined();
   });
 });

@@ -2,6 +2,8 @@ import { SourceArticle } from "@/src/ingest/types";
 import { generatedSocialPostSchema, GeneratedSocialPost } from "./schema";
 import { createLocalPost } from "./local-copy";
 import { buildFinalPost, validateGeneratedPost } from "./validate";
+import { plannedCaptionBudget, strictestPlatformLimit } from "./caption-limits";
+import { contentRules } from "@/config/content-rules";
 import { getAISettings } from "@/src/config/ai-settings";
 import { getStoredCredential } from "@/src/config/credentials";
 import { recentFeedback } from "@/src/workspace/store";
@@ -10,7 +12,19 @@ export function finalizeGeneratedPost(input: GeneratedSocialPost) {
   return buildFinalPost(input);
 }
 
-const systemPrompt = `Create a warm, practical Savvy Cyber Kids social post for families. Preserve the article title exactly. Use plain text only: do not use emojis or decorative symbols. Return exactly two topical hashtags; do not include #savvycyberkids or #cyberhero. Leave graphic_guidance empty unless the image genuinely needs it. The composer already renders a full-bleed photo with a soft gradient and the headline in the lower third, and that default is correct for almost every article photo. Set source_image_has_text to true only when the image is a designed graphic whose own words or logo would be cropped away, such as an infographic, a quote card, a news banner, a title card, or a poster; an ordinary photograph that merely happens to include a sign, a screen, or a brand mark is not one of these, so leave it false. The composer handles the framing itself once that flag is set, so do not also describe the framing in graphic_guidance. Never ask for an opaque panel, a solid box, or a black bar behind the title. Never ask the image model to replace an available article image. Use short actionable guidance only when it helps, such as "center the subject" or "focus the lower third". Respond with JSON only matching this shape: {"topic_heading":"string","article_title":"string","caption":"string","hashtags":["#tag1","#tag2"],"graphic_guidance":"optional visual instruction","source_image_has_text":false}.`;
+/**
+ * The caption shares one string with the hashtags, and X counts all of it. The
+ * cap here is what is left of that limit after the two fixed hashtags and two
+ * generated ones, so the copy arrives publishable rather than being trimmed on
+ * the way into review.
+ */
+const captionCap = plannedCaptionBudget();
+
+const systemPrompt = `Create a warm, practical Savvy Cyber Kids social post for families. Preserve the article title exactly. Use plain text only: do not use emojis or decorative symbols.
+
+Length is a hard requirement. The caption and the hashtags are published as one piece of text and must fit X's ${strictestPlatformLimit}-character limit. Two fixed hashtags (${contentRules.hashtags.required.join(" ")}) are added to your two after you answer, and all four count against that limit. So: write a caption of at most ${captionCap} characters, count the characters before you answer, and cut a sentence rather than run over. One or two tight sentences is the right shape. Keep each hashtag you return to ${contentRules.caption.maxHashtagLength} characters or fewer.
+
+Return exactly two topical hashtags; do not include #savvycyberkids or #cyberhero. Leave graphic_guidance empty unless the image genuinely needs it. The composer already renders a full-bleed photo with a soft gradient and the headline in the lower third, and that default is correct for almost every article photo. Set source_image_has_text to true only when the image is a designed graphic whose own words or logo would be cropped away, such as an infographic, a quote card, a news banner, a title card, or a poster; an ordinary photograph that merely happens to include a sign, a screen, or a brand mark is not one of these, so leave it false. The composer handles the framing itself once that flag is set, so do not also describe the framing in graphic_guidance. Never ask for an opaque panel, a solid box, or a black bar behind the title. Never ask the image model to replace an available article image. Use short actionable guidance only when it helps, such as "center the subject" or "focus the lower third". Respond with JSON only matching this shape: {"topic_heading":"string","article_title":"string","caption":"string","hashtags":["#tag1","#tag2"],"graphic_guidance":"optional visual instruction","source_image_has_text":false}.`;
 
 async function apiKey(provider: "openai" | "anthropic" | "openai-compatible") {
   const stored = await getStoredCredential(provider);

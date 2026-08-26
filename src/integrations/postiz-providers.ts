@@ -76,3 +76,17 @@ export function providerUnsupportedReason(identifier: string): string | undefine
 export function providerLabel(identifier: string): string {
   return providerRule(identifier).label ?? identifier;
 }
+
+/**
+ * The binding character limit across a set of channels.
+ *
+ * Copy has to fit the strictest platform it is going to, not the average one:
+ * selecting X alongside Facebook means 280, not 63,206. Returned with the label
+ * so the reviewer is told which platform is doing the constraining.
+ */
+export function tightestProviderLimit(identifiers: string[]): { label: string; limit: number } | undefined {
+  return identifiers
+    .map((identifier) => ({ label: providerLabel(identifier), limit: providerLimit(identifier) }))
+    .filter((entry): entry is { label: string; limit: number } => typeof entry.limit === "number")
+    .sort((a, b) => a.limit - b.limit)[0];
+}

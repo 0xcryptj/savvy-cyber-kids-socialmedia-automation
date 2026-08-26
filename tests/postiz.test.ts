@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "fs/promises";
 import { tmpdir } from "os";
 import path from "path";
 import { WorkspacePost } from "@/src/workspace/types";
-import { providerLimit, providerSettings, providerUnsupportedReason } from "@/src/integrations/postiz-providers";
+import { providerLimit, providerSettings, providerUnsupportedReason, tightestProviderLimit } from "@/src/integrations/postiz-providers";
 import { composePostContent, graphicFingerprint } from "@/src/integrations/postiz-content";
 import { PostizError } from "@/src/integrations/postiz-client";
 import { preflightExport } from "@/src/integrations/postiz-preflight";
@@ -252,5 +252,21 @@ describe("preflight", () => {
     const report = await preflightExport(posts, [channel("i1", "facebook")], ["i1"]);
     expect(report.ok).toBe(false);
     expect(report.issues.some((issue) => issue.code === "budget")).toBe(true);
+  });
+});
+
+describe("the binding character limit", () => {
+  it("is the strictest channel selected, not the roomiest", () => {
+    expect(tightestProviderLimit(["facebook", "x", "linkedin"])).toEqual({ label: "X", limit: 280 });
+  });
+
+  it("names the platform doing the constraining", () => {
+    expect(tightestProviderLimit(["facebook", "bluesky"])).toEqual({ label: "Bluesky", limit: 300 });
+  });
+
+  it("ignores channels with no published limit", () => {
+    expect(tightestProviderLimit(["youtube", "linkedin"])).toEqual({ label: "LinkedIn", limit: 3_000 });
+    expect(tightestProviderLimit(["youtube", "tiktok"])).toBeUndefined();
+    expect(tightestProviderLimit([])).toBeUndefined();
   });
 });

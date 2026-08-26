@@ -13,9 +13,14 @@ function parseBody(body: unknown) {
   const { postIds, integrationIds, date, type } = body as Record<string, unknown>;
   if (!Array.isArray(postIds) || !postIds.length || postIds.length > 100 || !postIds.every((item) => typeof item === "string")) return null;
   if (!Array.isArray(integrationIds) || !integrationIds.length || !integrationIds.every((item) => typeof item === "string")) return null;
-  if (typeof date !== "string") return null;
+  if (date !== undefined && typeof date !== "string") return null;
   if (type !== undefined && (typeof type !== "string" || !exportTypes.has(type))) return null;
-  return { postIds: postIds as string[], integrationIds: integrationIds as string[], date, type: (type as "schedule" | "now" | "draft") ?? "schedule" };
+  const resolved = (type as "schedule" | "now" | "draft") ?? "schedule";
+  // A draft is a handoff, not a booking: the reviewer places it on the Postiz
+  // calendar there, so this side has no time to ask them for. Postiz still
+  // wants a date field on the payload, and now is the honest one.
+  if (typeof date !== "string" && resolved !== "draft") return null;
+  return { postIds: postIds as string[], integrationIds: integrationIds as string[], date: typeof date === "string" ? date : new Date().toISOString(), type: resolved };
 }
 
 /** Export status for the approved queue, so the UI can show what already went out. */
@@ -31,7 +36,7 @@ export async function POST(request: NextRequest) {
   const originError = sameOrigin(request);
   if (originError) return originError;
   const parsed = parseBody(await request.json().catch(() => null));
-  if (!parsed) return NextResponse.json({ error: "Select posts, Postiz channels, and a schedule time" }, { status: 400 });
+  if (!parsed) return NextResponse.json({ error: "Select posts and Postiz channels, and a schedule time when scheduling" }, { status: 400 });
 
   const scheduleDate = new Date(parsed.date);
   if (Number.isNaN(scheduleDate.getTime())) return NextResponse.json({ error: "Choose a valid schedule time" }, { status: 400 });
