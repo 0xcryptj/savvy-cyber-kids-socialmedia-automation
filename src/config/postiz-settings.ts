@@ -1,5 +1,6 @@
 import { chmod, mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
+import { documents } from "@/src/storage";
 import { getStoredPostizCredential } from "./credentials";
 
 export type PostizTest = { status: "success" | "failed"; testedAt: string; reason?: string; channelCount?: number };
@@ -42,7 +43,8 @@ function normalizeApiUrl(value: string | undefined): string | undefined {
 }
 
 async function readStored(): Promise<StoredPostiz> {
-  try { return JSON.parse(await readFile(filePath(), "utf8")) as StoredPostiz; }
+  if (process.env.NODE_ENV === "production" && (process.env.BLOB_STORE_ID || process.env.BLOB_READ_WRITE_TOKEN)) return (await documents.read<StoredPostiz>("postiz-settings")) ?? {};
+  try { return JSON.parse(await readFile(/* turbopackIgnore: true */ filePath(), "utf8")) as StoredPostiz; }
   catch { return {}; }
 }
 
@@ -77,6 +79,10 @@ export async function savePostizSettings(input: { apiUrl?: string; lastTest?: Po
   const next: StoredPostiz = { ...(apiUrl ? { apiUrl } : {}), ...(input.lastTest ?? stored.lastTest ? { lastTest: input.lastTest ?? stored.lastTest } : {}) };
 
   const target = filePath();
+  if (process.env.NODE_ENV === "production" && (process.env.BLOB_STORE_ID || process.env.BLOB_READ_WRITE_TOKEN)) {
+    await documents.write("postiz-settings", next);
+    return getPostizSettings();
+  }
   await mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
   await writeFile(target, JSON.stringify(next, null, 2), { mode: 0o600 });
   await chmod(target, 0o600);

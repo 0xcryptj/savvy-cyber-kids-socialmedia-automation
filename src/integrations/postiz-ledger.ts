@@ -47,7 +47,7 @@ function ledgerPath(): string {
 
 async function readLedger(): Promise<LedgerState> {
   try {
-    const parsed = JSON.parse(await readFile(ledgerPath(), "utf8")) as Partial<LedgerState>;
+    const parsed = JSON.parse(await readFile(/* turbopackIgnore: true */ ledgerPath(), "utf8")) as Partial<LedgerState>;
     return { exports: parsed.exports ?? [], media: parsed.media ?? [], creates: parsed.creates ?? [] };
   } catch {
     return { exports: [], media: [], creates: [] };

@@ -30,7 +30,7 @@ function SourceThumb({ article }: { article: SourceArticle }) {
   </div>;
 }
 
-function ArticleCard({ article, onCreate, busy, isNew }: { article: SourceArticle; onCreate: (article: SourceArticle) => void; busy: string | null; isNew?: boolean }) {
+function ArticleCard({ article, onCreate, onVisibility, busy, isNew }: { article: SourceArticle; onCreate: (article: SourceArticle) => void; onVisibility: (article: SourceArticle) => void; busy: string | null; isNew?: boolean }) {
   return (
     <article className={`card source-card${isNew ? " source-card-new" : ""}`}>
       <SourceThumb article={article} />
@@ -42,6 +42,7 @@ function ArticleCard({ article, onCreate, busy, isNew }: { article: SourceArticl
           <button onClick={() => onCreate(article)} disabled={busy === article.canonicalUrl}>
             {busy === article.canonicalUrl ? <Spinner label="Writing post…" /> : "Create social post"}
           </button>
+          <button className="secondary" onClick={() => onVisibility(article)}>{article.hidden ? "Unhide article" : "Hide article"}</button>
           <a className="button outline" href={article.externalUrl || article.sourceUrl} target="_blank" rel="noreferrer">Open article ↗</a>
         </div>
       </div>
@@ -65,6 +66,7 @@ export function LibraryClient({ blog, news, pipelineUrls = [], initialErrors = {
   const [lastUpdated, setLastUpdated] = useState(updatedAt);
   const [freshUrls, setFreshUrls] = useState<string[]>(newUrls);
   const [updateNote, setUpdateNote] = useState<string | null>(null);
+  const [showHidden, setShowHidden] = useState(false);
   const [error, setError] = useState<string | null>(Object.entries(initialErrors).map(([category, message]) => `${category}: ${message}`).join(" | ") || null);
   const config = feedConfig[tab];
   // An approved post is already on its way to being published, so its source
@@ -72,12 +74,13 @@ export function LibraryClient({ blog, news, pipelineUrls = [], initialErrors = {
   const pipelineSet = useMemo(() => new Set(livePipelineUrls), [livePipelineUrls]);
   const isPipelined = useCallback((article: SourceArticle) => articleUrls(article).some((url) => pipelineSet.has(url)), [pipelineSet]);
   const available = useMemo(() => ({
-    blog: liveBlog.filter((article) => !isPipelined(article)),
-    news: liveNews.filter((article) => !isPipelined(article))
+    blog: liveBlog.filter((article) => !article.hidden && !isPipelined(article)),
+    news: liveNews.filter((article) => !article.hidden && !isPipelined(article))
   }), [liveBlog, liveNews, isPipelined]);
   const allForTab = tab === "blog" ? liveBlog : liveNews;
-  const articles = showPipelined ? allForTab : available[tab];
+  const articles = showPipelined ? allForTab.filter((article) => showHidden || !article.hidden) : (showHidden ? allForTab.filter((article) => !isPipelined(article)) : available[tab]);
   const hiddenCount = allForTab.length - available[tab].length;
+  const manuallyHiddenCount = allForTab.filter((article) => article.hidden).length;
   const counts = useMemo(() => ({ blog: available.blog.length, news: available.news.length }), [available]);
   const freshSet = useMemo(() => new Set(freshUrls), [freshUrls]);
 
@@ -121,6 +124,15 @@ export function LibraryClient({ blog, news, pipelineUrls = [], initialErrors = {
     }
   }
 
+  async function toggleVisibility(article: SourceArticle) {
+    setError(null);
+    const response = await fetch("/api/sources/visibility", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ category: article.category, canonicalUrl: article.canonicalUrl, hidden: !article.hidden }) });
+    const payload = await response.json();
+    if (!response.ok) { setError(payload.error || "Could not update article visibility"); return; }
+    const replace = (items: SourceArticle[]) => items.map((item) => item.canonicalUrl === article.canonicalUrl ? { ...item, hidden: !article.hidden || undefined } : item);
+    if (article.category === "blog") setLiveBlog(replace); else setLiveNews(replace);
+  }
+
   return (
     <>
       <div className="page-intro">
@@ -142,10 +154,10 @@ export function LibraryClient({ blog, news, pipelineUrls = [], initialErrors = {
         <button className={tab === "news" ? "active" : ""} onClick={() => setTab("news")}>News feed · {counts.news}</button>
       </div>
       {error ? <div className="card empty error-panel">{error}</div> : null}
-      {hiddenCount ? <p className="pipeline-note">{hiddenCount} approved {hiddenCount === 1 ? "article is" : "articles are"} already in the publishing queue. <button type="button" className="link-button" onClick={() => setShowPipelined((current) => !current)}>{showPipelined ? "Hide them" : "Show them"}</button></p> : null}
+      {hiddenCount ? <p className="pipeline-note">{hiddenCount} article{hiddenCount === 1 ? " is" : "s are"} currently filtered. <button type="button" className="link-button" onClick={() => setShowPipelined((current) => !current)}>{showPipelined ? "Hide queued" : "Show queued"}</button>{manuallyHiddenCount ? <button type="button" className="link-button" onClick={() => setShowHidden((current) => !current)}>{showHidden ? "Hide hidden" : `Show hidden (${manuallyHiddenCount})`}</button> : null}</p> : null}
       <div className="source-grid">
         {articles.map((article) => (
-          <ArticleCard key={article.id} article={article} onCreate={createPost} busy={busy} isNew={freshSet.has(article.canonicalUrl)} />
+          <ArticleCard key={article.id} article={article} onCreate={createPost} onVisibility={toggleVisibility} busy={busy} isNew={freshSet.has(article.canonicalUrl)} />
         ))}
         {!articles.length && !error ? <div className="card empty">No source articles loaded yet. Press “Update sources” to pull them in.</div> : null}
       </div>

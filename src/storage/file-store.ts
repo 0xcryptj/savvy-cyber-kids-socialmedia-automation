@@ -1,5 +1,6 @@
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "fs/promises";
 import path from "path";
+import { del, get, put } from "@vercel/blob";
 import { BlobStore, DocumentKey, DocumentStore, secretDocuments } from "./types";
 
 /** Overridable so tests get their own directory instead of the real one. */
@@ -14,7 +15,8 @@ const documentFiles: Record<DocumentKey, string> = {
   "source-cache": "source-cache.json",
   credentials: "credentials.json",
   settings: "settings.json",
-  pipeline: "pipeline.json"
+  pipeline: "pipeline.json",
+  auth: "auth.json"
 };
 
 /**
@@ -34,12 +36,12 @@ function serialize<T>(key: string, work: () => Promise<T>): Promise<T> {
 
 export class FileDocumentStore implements DocumentStore {
   private file(key: DocumentKey): string {
-    return path.join(storageRoot(), documentFiles[key]);
+    return path.join(/* turbopackIgnore: true */ storageRoot(), documentFiles[key]);
   }
 
   async read<T>(key: DocumentKey): Promise<T | undefined> {
     try {
-      return JSON.parse(await readFile(this.file(key), "utf8")) as T;
+      return JSON.parse(await readFile(/* turbopackIgnore: true */ this.file(key), "utf8")) as T;
     } catch {
       return undefined;
     }
@@ -81,7 +83,7 @@ function safeBlobKey(key: string): string {
 
 export class FileBlobStore implements BlobStore {
   private file(key: string): string {
-    return path.join(storageRoot(), safeBlobKey(key));
+    return path.join(/* turbopackIgnore: true */ storageRoot(), safeBlobKey(key));
   }
 
   async read(key: string): Promise<Uint8Array<ArrayBuffer> | undefined> {
@@ -89,7 +91,7 @@ export class FileBlobStore implements BlobStore {
       // A Node Buffer is a view onto a pooled allocation, which does not type
       // as a plain ArrayBuffer. Copy so callers get something they can pass to
       // fetch as a body.
-      return Uint8Array.from(await readFile(this.file(key)));
+      return Uint8Array.from(await readFile(/* turbopackIgnore: true */ this.file(key)));
     } catch {
       return undefined;
     }
@@ -104,4 +106,34 @@ export class FileBlobStore implements BlobStore {
   async delete(key: string): Promise<void> {
     await rm(this.file(key), { force: true });
   }
+}
+
+/** Vercel Functions have ephemeral disks; production state lives in private Blob storage. */
+export class VercelBlobDocumentStore implements DocumentStore {
+  private pathname(key: DocumentKey): string { return `documents/${documentFiles[key]}`; }
+  async read<T>(key: DocumentKey): Promise<T | undefined> {
+    const result = await get(this.pathname(key), { access: "private", useCache: false });
+    if (!result || result.statusCode !== 200) return undefined;
+    return JSON.parse(await new Response(result.stream).text()) as T;
+  }
+  async write<T>(key: DocumentKey, value: T): Promise<void> {
+    await put(this.pathname(key), JSON.stringify(value), { access: "private", allowOverwrite: true, contentType: "application/json" });
+  }
+  async update<T>(key: DocumentKey, mutate: (current: T | undefined) => T): Promise<T> {
+    const next = mutate(await this.read<T>(key));
+    await this.write(key, next);
+    return next;
+  }
+}
+
+export class VercelBlobStore implements BlobStore {
+  private pathname(key: string): string { return `assets/${safeBlobKey(key)}`; }
+  async read(key: string): Promise<Uint8Array<ArrayBuffer> | undefined> {
+    const result = await get(this.pathname(key), { access: "private", useCache: false });
+    return result && result.statusCode === 200 ? new Uint8Array(await new Response(result.stream).arrayBuffer()) : undefined;
+  }
+  async write(key: string, bytes: Uint8Array, contentType = "application/octet-stream"): Promise<void> {
+    await put(this.pathname(key), Buffer.from(bytes), { access: "private", allowOverwrite: true, contentType });
+  }
+  async delete(key: string): Promise<void> { await del(this.pathname(key)); }
 }

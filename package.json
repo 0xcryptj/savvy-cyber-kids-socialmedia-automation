@@ -4,7 +4,7 @@
   "description": "Human-in-the-loop local social content workspace for Savvy Cyber Kids",
   "private": true,
   "engines": {
-    "node": ">=20.9.0"
+    "node": "24.x"
   },
   "scripts": {
     "dev": "next dev",
@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@libsql/client": "^0.14.0",
+    "@vercel/blob": "^2.8.0",
     "drizzle-orm": "^0.45.2",
     "lucide-react": "^1.32.0",
     "next": "^16.3.1",

@@ -34,7 +34,11 @@ export type GraphicAdjustments = {
   regions?: OverlayRegion[];
   /** Replaces the generated topic heading when set. */
   topicHeading?: string;
+  /** Position and size of the Savvy Cyber Kids badge, as canvas percentages. */
+  badge?: BadgeAdjustment | null;
 };
+
+export type BadgeAdjustment = { x: number; y: number; width: number; height: number };
 
 /** A shaded rectangle, positioned as percentages of the canvas. */
 export type OverlayRegion = {
@@ -89,7 +93,8 @@ export const defaultAdjustments = {
   headingScale: 1,
   titleScale: 1,
   lineSpacing: 1.06,
-  scrim: "default" as ScrimStrength
+  scrim: "default" as ScrimStrength,
+  badge: { x: 70.9, y: 6.4, width: 22.2, height: 15 }
 };
 
 const bounds = new Map(sliderFields.map((field) => [field.key, field]));
@@ -120,6 +125,14 @@ export function clampAdjustments(input: unknown): GraphicAdjustments | undefined
   }
   if (typeof source.topicHeading === "string" && source.topicHeading.trim()) {
     adjustments.topicHeading = source.topicHeading.trim().slice(0, 60);
+  }
+  if (source.badge === null) adjustments.badge = null;
+  else if (source.badge && typeof source.badge === "object") {
+    const badge = source.badge as Record<string, unknown>;
+    adjustments.badge = {
+      x: percent(badge.x, 82), y: percent(badge.y, 6),
+      width: percent(badge.width, 22), height: percent(badge.height, 15)
+    };
   }
   const regions = clampRegions(source.regions);
   if (regions) adjustments.regions = regions;

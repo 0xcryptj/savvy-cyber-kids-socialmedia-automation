@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { ContentCategory, contentCategories } from "@/config/feeds";
 import { SourceArticle } from "./types";
+import { documents } from "@/src/storage";
 
 /**
  * The last known state of each feed, kept on disk.
@@ -27,8 +28,9 @@ function cachePath(): string {
 }
 
 export async function readSourceCache(): Promise<SourceCache> {
+  if (process.env.NODE_ENV === "production" && (process.env.BLOB_STORE_ID || process.env.BLOB_READ_WRITE_TOKEN)) return (await documents.read<SourceCache>("source-cache")) ?? {};
   try {
-    const parsed = JSON.parse(await readFile(cachePath(), "utf8")) as SourceCache;
+    const parsed = JSON.parse(await readFile(/* turbopackIgnore: true */ cachePath(), "utf8")) as SourceCache;
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
@@ -40,6 +42,10 @@ export async function readCachedCategory(category: ContentCategory): Promise<Sou
 }
 
 async function writeSourceCache(cache: SourceCache): Promise<void> {
+  if (process.env.NODE_ENV === "production" && (process.env.BLOB_STORE_ID || process.env.BLOB_READ_WRITE_TOKEN)) {
+    await documents.write("source-cache", cache);
+    return;
+  }
   const target = cachePath();
   await mkdir(path.dirname(target), { recursive: true });
   await writeFile(target, JSON.stringify(cache, null, 2));
@@ -55,6 +61,8 @@ export type RefreshResult = { category: ContentCategory; total: number; added: s
 export async function storeRefreshedArticles(category: ContentCategory, articles: SourceArticle[]): Promise<RefreshResult> {
   const cache = await readSourceCache();
   const previous = cache[category];
+  const hiddenByUrl = new Map((previous?.articles ?? []).filter((article) => article.hidden).map((article) => [article.canonicalUrl, true]));
+  articles = articles.map((article) => hiddenByUrl.has(article.canonicalUrl) ? { ...article, hidden: true } : article);
   // A cold cache is not "all new" - that would flag the whole feed on first run.
   const added = previous ? articles.map((article) => article.canonicalUrl).filter((url) => !knownUrls(previous).has(url)) : [];
   const fetchedAt = new Date().toISOString();
@@ -72,6 +80,16 @@ export async function storeRefreshFailure(category: ContentCategory, message: st
   const fetchedAt = new Date().toISOString();
   await writeSourceCache({ ...cache, [category]: { articles: previous?.articles ?? [], fetchedAt: previous?.fetchedAt ?? fetchedAt, lastAdded: previous?.lastAdded ?? [], error: message } });
   return { category, total: previous?.articles.length ?? 0, added: [], fetchedAt: previous?.fetchedAt ?? fetchedAt, error: message };
+}
+
+export async function setArticleHidden(category: ContentCategory, canonicalUrl: string, hidden: boolean): Promise<SourceArticle[]> {
+  const cache = await readSourceCache();
+  const entry = cache[category];
+  if (!entry) throw new Error("Source category is not loaded");
+  if (!entry.articles.some((article) => article.canonicalUrl === canonicalUrl)) throw new Error("Article not found");
+  const articles = entry.articles.map((article) => article.canonicalUrl === canonicalUrl ? { ...article, hidden: hidden || undefined } : article);
+  await writeSourceCache({ ...cache, [category]: { ...entry, articles } });
+  return articles;
 }
 
 /** Newest fetch time across the feeds, for the "updated N ago" label. */

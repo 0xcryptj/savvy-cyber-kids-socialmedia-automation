@@ -5,8 +5,20 @@ import { ServerLifecycle } from "./components/ServerLifecycle";
 import type { ReactNode } from "react";
 import { getFeedHealth } from "@/src/ingest/wordpress";
 import { getPipelineState } from "@/src/workspace/pipeline";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Savvy Cyber Kids social workspace",
+  icons: {
+    icon: "/branding/sck-logo-150.png",
+    shortcut: "/branding/sck-logo-150.png",
+    apple: "/branding/sck-logo-150.png"
+  }
+};
 
 export const revalidate = 300;
+// State is stored in the runtime Blob backend on Vercel; never snapshot it during build.
+export const dynamic = "force-dynamic";
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });

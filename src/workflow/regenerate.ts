@@ -26,22 +26,21 @@ function fallbackArticle(post: WorkspacePost): SourceArticle {
   };
 }
 
+async function resolveArticle(previous: WorkspacePost): Promise<{ article: SourceArticle; usedFallbackSource: boolean }> {
+  try {
+    const refreshed = await findSourceArticle(previous.category as ContentCategory, previous.externalUrl || previous.sourceUrl);
+    if (refreshed) return { article: await hydrateArticle(refreshed), usedFallbackSource: false };
+  } catch {
+    // Regeneration remains available when the source feed is temporarily down.
+  }
+  return { article: fallbackArticle(previous), usedFallbackSource: true };
+}
+
 export async function regeneratePost(id: string, reviewerGuidance?: string): Promise<WorkspacePost> {
   const previous = await getPost(id);
   if (!previous) throw new Error("Post not found");
 
-  let article = fallbackArticle(previous);
-  let usedFallbackSource = true;
-  try {
-    const refreshed = await findSourceArticle(previous.category as ContentCategory, previous.externalUrl || previous.sourceUrl);
-    if (refreshed) {
-      article = await hydrateArticle(refreshed);
-      usedFallbackSource = false;
-    }
-  } catch {
-    // Regeneration remains available when the source feed is temporarily down.
-  }
-
+  const { article, usedFallbackSource } = await resolveArticle(previous);
   const guidance = boundedText(reviewerGuidance, 1000);
   const generatedRaw = await generateSocialPost(article, guidance);
   const generated = finalizeGeneratedPost(generatedRaw);
@@ -88,4 +87,21 @@ export async function regeneratePost(id: string, reviewerGuidance?: string): Pro
     publishedVia: undefined,
     publishExternalId: undefined
   });
+}
+
+/**
+ * Rewrites only the caption and hashtags, leaving the topic heading, article
+ * title, and graphic untouched. A full regenerate reflows the graphic too,
+ * which is wasted work - and destructive on an approved post, whose graphic is
+ * already frozen - when the reviewer just wants different words.
+ */
+export async function regenerateCaption(id: string, reviewerGuidance?: string): Promise<WorkspacePost> {
+  const previous = await getPost(id);
+  if (!previous) throw new Error("Post not found");
+
+  const { article } = await resolveArticle(previous);
+  const guidance = boundedText(reviewerGuidance, 1000);
+  const generatedRaw = await generateSocialPost(article, guidance);
+  const { caption, hashtags } = finalizeGeneratedPost(generatedRaw);
+  return savePost({ ...previous, caption, hashtags });
 }

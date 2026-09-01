@@ -26,6 +26,7 @@ export type SourceArticle = {
   excerpt: string;
   body: string;
   featuredImageUrl?: string;
+  hidden?: boolean;
   tags: string[];
   publishedAt: string;
   sourceType?: "rss" | "manual_url" | "wordpress" | "scrape";

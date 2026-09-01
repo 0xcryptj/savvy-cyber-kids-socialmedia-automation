@@ -114,6 +114,7 @@ export function GraphicEditor({
   }
 
   function deleteSelected() {
+    if (selection === "badge") { apply({ ...draft, badge: null }); setSelection(null); return; }
     if (typeof selection !== "object" || !selection) return;
     apply({ ...draft, regions: regions.filter((_, index) => index !== selection.region) });
     setSelection(null);
@@ -215,6 +216,8 @@ export function GraphicEditor({
       </label>
       <p className="editor-note">The headline below the divider is the article title and is preserved exactly.</p>
     </div> : null}
+
+    {selection === "badge" || values.badge === null ? <div className="editor-panel"><div className="editor-panel-head"><span>Brand badge</span><div className="editor-inline-actions">{values.badge === null ? <button type="button" onClick={() => apply({ ...draft, badge: undefined })}>Restore</button> : <button type="button" onClick={deleteSelected}>Remove</button>}</div></div><p className="editor-note">Select the badge on the canvas to move it. Drag its corner handle to resize it.</p></div> : null}
 
     <div className="editor-panel">
       <div className="editor-panel-head">

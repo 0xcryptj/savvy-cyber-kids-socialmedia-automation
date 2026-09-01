@@ -13,7 +13,8 @@ export type DocumentKey =
   | "source-cache"
   | "credentials"
   | "settings"
-  | "pipeline";
+  | "pipeline"
+  | "auth";
 
 export interface DocumentStore {
   read<T>(key: DocumentKey): Promise<T | undefined>;

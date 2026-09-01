@@ -35,6 +35,7 @@ export default function ReviewPage() {
   const [loading, setLoading] = useState(true);
   const [transitioning, setTransitioning] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
+  const [regeneratingCaption, setRegeneratingCaption] = useState(false);
   const [graphicLoading, setGraphicLoading] = useState(true);
   const [graphicError, setGraphicError] = useState(false);
   const [feedbackNote, setFeedbackNote] = useState("");
@@ -109,6 +110,22 @@ export default function ReviewPage() {
     }
   }
 
+  async function regenerateCaption() {
+    if (!post || regeneratingCaption) return;
+    setRegeneratingCaption(true); setError(null);
+    try {
+      const response = await fetch(`/api/posts/${post.id}/regenerate-caption`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reviewerGuidance: feedbackNote }) });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Caption regeneration failed");
+      setPost(payload); setCopy(`${payload.caption}\n\n${payload.hashtags.join(" ")}`);
+      setReviewQueue(current => current.map(item => item.id === payload.id ? payload : item));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Caption regeneration failed");
+    } finally {
+      setRegeneratingCaption(false);
+    }
+  }
+
   async function sharePost() {
     if (!post) return;
     const finalCopy = copy;
@@ -154,7 +171,7 @@ export default function ReviewPage() {
     <div className="review-layout">
       <article className="card preview-card">{sourceWarning ? <div className="warning-panel">{sourceWarning}</div> : null}
         {post.sourceImageHasText ? <div className="detection-note">This source image was detected as a designed graphic (a banner, title card, or infographic), so it is shown whole instead of cropped. <button type="button" className="link-button" onClick={() => setFeedbackNote(current => `${current.trim()}${current.trim() ? " " : ""}Zoom in and fill the frame.`)}>Crop it anyway</button></div> : null}
-        <div className="post-main"><div className={graphicLoading ? "graphic graphic-loading" : "graphic"}>{graphicLoading ? <div className="graphic-status"><Spinner label={regenerating ? "Regenerating…" : "Rendering branded graphic…"} /></div> : null}{graphicError ? <div className="graphic-status error-panel">Graphic rendering failed. Try regenerate.</div> : null}<Image key={graphicSrc} src={graphicSrc} alt="Savvy Cyber Kids social post preview" width={1080} height={1350} sizes="(max-width: 900px) 100vw, 55vw" priority unoptimized onLoad={() => setGraphicLoading(false)} onError={() => { setGraphicLoading(false); setGraphicError(true); }} /></div><div className="post-copy"><span className={post.status === "REJECTED" ? "status status-rejected" : "status"}>{post.status.replace("_", " ")}</span><h2>{post.topicHeading}</h2><p className="meta">{new Date(post.publishedAt).toLocaleDateString()} · <a href={post.externalUrl || post.sourceUrl} target="_blank" rel="noreferrer">Open source article ↗</a></p><h3>{post.articleTitle}</h3><label className="caption-label" htmlFor="copy">Caption + hashtags</label><textarea className="edit-area copy-editor" id="copy" value={copy} onChange={e=>setCopy(e.target.value)} /><small className="field-hint">Keep four hashtags on the final line. The two required Savvy Cyber Kids tags stay included.</small></div></div>
+        <div className="post-main"><div className={graphicLoading ? "graphic graphic-loading" : "graphic"}>{graphicLoading ? <div className="graphic-status"><Spinner label={regenerating ? "Regenerating…" : "Rendering branded graphic…"} /></div> : null}{graphicError ? <div className="graphic-status error-panel">Graphic rendering failed. Try regenerate.</div> : null}<Image key={graphicSrc} src={graphicSrc} alt="Savvy Cyber Kids social post preview" width={1080} height={1350} sizes="(max-width: 900px) 100vw, 55vw" priority unoptimized onLoad={() => setGraphicLoading(false)} onError={() => { setGraphicLoading(false); setGraphicError(true); }} /></div><div className="post-copy"><span className={post.status === "REJECTED" ? "status status-rejected" : "status"}>{post.status.replace("_", " ")}</span><h2>{post.topicHeading}</h2><p className="meta">{new Date(post.publishedAt).toLocaleDateString()} · <a href={post.externalUrl || post.sourceUrl} target="_blank" rel="noreferrer">Open source article ↗</a></p><h3>{post.articleTitle}</h3><div className="caption-label-row"><label className="caption-label" htmlFor="copy">Caption + hashtags</label><button type="button" className="link-button" onClick={regenerateCaption} disabled={regeneratingCaption || transitioning || regenerating}>{regeneratingCaption ? <Spinner label="Regenerating…" /> : "Regenerate caption"}</button></div><textarea className="edit-area copy-editor" id="copy" value={copy} onChange={e=>setCopy(e.target.value)} /><small className="field-hint">Keep four hashtags on the final line. The two required Savvy Cyber Kids tags stay included. Regenerating the caption leaves the graphic and headline untouched.</small></div></div>
         <div className="actions"><label className="regeneration-guidance" htmlFor="regeneration-guidance">Copy + graphic improvement<textarea id="regeneration-guidance" value={feedbackNote} onChange={e=>setFeedbackNote(e.target.value)} placeholder="Describe copy or layout changes, or use a suggestion below." maxLength={1000} /><span className="feedback-presets">{feedbackPresets.map(preset => <button type="button" className="feedback-preset" key={preset} onClick={() => setFeedbackNote(current => `${current.trim()}${current.trim() ? " " : ""}${preset}.`)}>{preset}</button>)}</span></label><div className="review-action-buttons">{["PENDING_REVIEW", "REVISION"].includes(post.status) ? <><button onClick={()=>transition("APPROVED")} disabled={transitioning}>{transitioning ? <Spinner label="Saving…" /> : "Approve"}</button><button className="secondary" onClick={()=>transition("REVISION")} disabled={transitioning}>Save edit</button><button className="outline" onClick={()=>transition("REJECTED")} disabled={transitioning}>Reject</button><button className="secondary" onClick={regenerate} disabled={transitioning || regenerating}>{regenerating ? <Spinner label="Regenerating…" /> : "Regenerate"}</button></> : post.status === "REJECTED" ? <><span className="review-rejected">× Rejected and kept in the review log</span><button className="secondary" onClick={regenerate} disabled={regenerating}>{regenerating ? <Spinner label="Regenerating…" /> : "Regenerate"}</button></> : post.status === "APPROVED" ? <span className="review-complete">✓ Approved and kept in the review log</span> : <span className="review-complete">{post.status.replace("_", " ")}</span>}</div></div>
         <GraphicEditor postId={post.id} graphicPath={post.graphicPath} imageUrl={(post.generatedImageUrl || post.featuredImageUrl)?.replaceAll("&amp;", "&")} topicHeading={post.topicHeading} articleTitle={post.articleTitle} guidance={post.graphicGuidance} sourceImageHasText={post.sourceImageHasText} saved={post.graphicAdjustments} onSaved={(adjustments) => { setPost(current => current ? { ...current, graphicAdjustments: adjustments } : current); setGraphicVersion(version => version + 1); }} />
       </article>

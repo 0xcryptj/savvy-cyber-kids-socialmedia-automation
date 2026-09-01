@@ -177,6 +177,9 @@ button.outline:hover,.outline:hover{border-color:var(--ink-soft)}
 .meta{color:var(--muted);font-size:12px;margin:0 0 18px}
 .caption{font-size:14px;line-height:1.6;color:var(--ink-soft)}
 .caption-label{display:block;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin:18px 0 7px}
+.caption-label-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.caption-label-row .caption-label{margin:18px 0 7px;flex:0 0 auto}
+.caption-label-row .link-button{font-size:12px;font-weight:600;white-space:nowrap}
 .hashtags{color:var(--navy);font-size:13px;line-height:1.8;overflow-wrap:anywhere}
 .post-copy textarea,.edit-area{width:100%;min-height:110px;border:1px solid var(--line);border-radius:var(--radius-sm);padding:11px 12px;font:inherit;line-height:1.55;background:var(--surface-2);color:var(--ink);resize:vertical}
 .post-copy textarea:focus,.edit-area:focus{outline:2px solid var(--sky);outline-offset:1px;border-color:var(--navy)}
@@ -372,6 +375,9 @@ button.outline:hover,.outline:hover{border-color:var(--ink-soft)}
 .pf-under{color:var(--mint-ink);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
 
 /* ---------- settings ---------- */
+.setup-notice{padding:20px 24px;margin-bottom:18px;border:1px solid rgba(91,141,251,.35);background:linear-gradient(135deg,rgba(91,141,251,.13),rgba(20,21,25,.96));}
+.setup-notice h3{margin:0 0 6px}
+.setup-notice p:not(.eyebrow){color:var(--ink-soft);max-width:68ch;margin:0 0 14px}
 .settings-panel{padding:24px;margin-bottom:18px}
 .settings-configuration{border-top:2px solid var(--navy)}
 .settings-heading{display:flex;justify-content:space-between;align-items:start}

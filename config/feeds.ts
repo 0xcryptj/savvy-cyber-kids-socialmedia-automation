@@ -8,7 +8,7 @@ export const feedConfig = {
     category: "blog" as const,
     label: "Blog content",
     pageUrl: sourceUrls.blog,
-    rssUrl: "https://savvycyberkids.org/tech-talk/blog/feed/",
+    rssUrl: "https://savvycyberkids.org/blog/feed/",
     restUrl: "https://savvycyberkids.org/wp-json/wp/v2/posts",
     wpCategoryId: 15,
     perPage: 12
@@ -17,8 +17,9 @@ export const feedConfig = {
     category: "news" as const,
     label: "News feed content",
     pageUrl: sourceUrls.newsFeed,
-    rssUrl: "https://savvycyberkids.org/tech-talk/savvy-cyber-kids-news-feed/feed/",
+    rssUrl: "https://savvycyberkids.org/news/feed/",
     restUrl: "https://savvycyberkids.org/wp-json/wp/v2/posts",
+    wpCategoryId: 24,
     perPage: 16
   }
 } as const;

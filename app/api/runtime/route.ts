@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sameOrigin } from "@/src/lib/request-security";
+import { isAuthenticated } from "@/src/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -37,14 +38,14 @@ function scheduleShutdown() {
 
 export async function GET() {
   const token = expectedToken();
-  return NextResponse.json({ lifecycleEnabled: Boolean(token), token });
+  return NextResponse.json({ lifecycleEnabled: Boolean(token) });
 }
 
 export async function POST(request: NextRequest) {
   const originError = sameOrigin(request);
   if (originError) return originError;
   const body = await request.json().catch(() => null) as { token?: unknown; sessionId?: unknown; event?: unknown } | null;
-  if (!body || !validToken(body.token) || !validSessionId(body.sessionId)) return NextResponse.json({ error: "Invalid runtime session" }, { status: 403 });
+  if (!body || !(validToken(body.token) || await isAuthenticated()) || !validSessionId(body.sessionId)) return NextResponse.json({ error: "Invalid runtime session" }, { status: 403 });
   pruneSessions();
   if (body.event === "close") sessions.delete(body.sessionId);
   else sessions.set(body.sessionId, { lastSeen: Date.now() });

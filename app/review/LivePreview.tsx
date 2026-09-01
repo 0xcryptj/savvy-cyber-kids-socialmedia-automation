@@ -81,12 +81,7 @@ export function LivePreview({
       ))}
 
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/branding/sck-logo-150.png"
-        alt=""
-        draggable={false}
-        style={{ position: "absolute", top: canvaTemplate.layout.logoTop, right: canvaTemplate.layout.logoRight, width: canvaTemplate.layout.logoWidth, height: canvaTemplate.layout.logoHeight, objectFit: "contain" }}
-      />
+      {adjustments.badge !== null ? <img src="/branding/sck-logo-150.png" alt="" draggable={false} style={{ position: "absolute", left: `${adjustments.badge?.x ?? ((canvaTemplate.width - canvaTemplate.layout.logoRight - canvaTemplate.layout.logoWidth) / canvasWidth) * 100}%`, top: `${adjustments.badge?.y ?? (canvaTemplate.layout.logoTop / canvasHeight) * 100}%`, width: `${adjustments.badge?.width ?? (canvaTemplate.layout.logoWidth / canvasWidth) * 100}%`, height: `${adjustments.badge?.height ?? (canvaTemplate.layout.logoHeight / canvasHeight) * 100}%`, objectFit: "contain" }} /> : null}
 
       <div style={{ position: "absolute", left: sideInset, right: sideInset, top: layout.textTop, bottom: textBottomInset, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start" }}>
         <div data-element="heading" style={{ color: "rgba(255,255,255,0.96)", fontSize: headingScale(heading, adjustments.headingScale ?? 1), fontWeight: 700, letterSpacing: 2.5, textAlign: "center", marginBottom: headingGap, padding: "0 20px" }}>

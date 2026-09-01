@@ -29,5 +29,8 @@ export async function fetchText(url: string, revalidate = 300, noStore = false):
 export async function fetchJson<T>(url: string, revalidate = 300, noStore = false): Promise<T> {
   const response = await safeFetch(url, requestInit(revalidate, noStore));
   if (!response.ok) throw new Error(`Request failed (${response.status}): ${url}`);
-  return response.json() as Promise<T>;
+  const body = await response.text();
+  if (!body.trim()) throw new Error(`Empty JSON response (${response.status}): ${url}`);
+  try { return JSON.parse(body) as T; }
+  catch { throw new Error(`Invalid JSON response (${response.status}): ${url}`); }
 }

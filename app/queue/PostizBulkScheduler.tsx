@@ -75,6 +75,7 @@ export function PostizBulkScheduler({ posts }: { posts: WorkspacePost[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftCaption, setDraftCaption] = useState("");
   const [savingCaption, setSavingCaption] = useState(false);
+  const [regeneratingCaptionId, setRegeneratingCaptionId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -247,6 +248,29 @@ export function PostizBulkScheduler({ posts }: { posts: WorkspacePost[] }) {
       setError(saveError instanceof Error ? saveError.message : "Could not save the caption");
     } finally {
       setSavingCaption(false);
+    }
+  }
+
+  /**
+   * Unlike Shorten caption, this hits the AI and writes straight through - it
+   * can change the hashtags too, and draftCaption alone has nowhere to hold
+   * those, so there is nothing worth staging before a save.
+   */
+  async function regenerateCaption(id: string) {
+    setRegeneratingCaptionId(id); setError(null);
+    try {
+      const response = await fetch(`/api/posts/${id}/regenerate-caption`, { method: "POST" });
+      const updated = await response.json();
+      if (!response.ok) throw new Error(updated.error || "Could not regenerate the caption");
+      setLivePosts((current) => current.map((post) => (post.id === id ? { ...post, caption: updated.caption, hashtags: updated.hashtags } : post)));
+      if (editingId === id) setDraftCaption(updated.caption);
+      setOutcomes((current) => { const next = { ...current }; delete next[id]; return next; });
+      setRevision((current) => current + 1);
+      setMessage("Caption regenerated.");
+    } catch (regenerateError) {
+      setError(regenerateError instanceof Error ? regenerateError.message : "Could not regenerate the caption");
+    } finally {
+      setRegeneratingCaptionId(null);
     }
   }
 
@@ -451,6 +475,7 @@ export function PostizBulkScheduler({ posts }: { posts: WorkspacePost[] }) {
               {/* The same shortening generation applies, so the reviewer is not
                   counting characters by hand against a cap the code knows. */}
               {limit ? <button type="button" className="outline" onClick={() => setDraftCaption(fitCaption(draftCaption, post.hashtags, limit))} disabled={savingCaption || length <= limit}>Shorten caption</button> : null}
+              <button type="button" className="outline" onClick={() => regenerateCaption(post.id)} disabled={savingCaption || regeneratingCaptionId === post.id}>{regeneratingCaptionId === post.id ? <Spinner label="Regenerating…" /> : "Regenerate caption"}</button>
               <button type="button" onClick={() => saveCaption(post.id)} disabled={savingCaption || !draftCaption.trim()}>{savingCaption ? <Spinner label="Saving…" /> : "Save caption"}</button>
             </div>
           </div> : null}

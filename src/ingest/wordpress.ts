@@ -33,7 +33,8 @@ type WpPost = {
 };
 
 function featuredImage(post: WpPost): string | undefined {
-  return post._embedded?.["wp:featuredmedia"]?.[0]?.source_url;
+  return post._embedded?.["wp:featuredmedia"]?.[0]?.source_url
+    ?? post.content?.rendered?.match(/<img\b[^>]*\bsrc=["']([^"']+)/i)?.[1];
 }
 
 function toBlogArticle(post: WpPost): SourceArticle {
@@ -87,9 +88,9 @@ async function fetchSourceArticles(category: ContentCategory, noStore: boolean):
     }));
   } catch { /* try the WordPress API next */ }
 
-  if (category === "blog") try {
+  try {
     const { restUrl, perPage } = feedConfig[category];
-    const query = `?categories=${feedConfig.blog.wpCategoryId}&per_page=${perPage}&_embed=1`;
+    const query = `?categories=${feedConfig[category].wpCategoryId}&per_page=${perPage}&_embed=1`;
     const posts = await fetchJson<WpPost[]>(`${restUrl}${query}`, 300, noStore);
     if (posts.length) return posts.map(category === "blog" ? toBlogArticle : toNewsArticle);
   } catch { /* scrape the public archive when APIs are unavailable */ }

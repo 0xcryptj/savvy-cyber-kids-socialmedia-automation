@@ -105,8 +105,10 @@ async function cropTowardFrame(image: UsableImage, zoom: number, focusX: number,
   }
 }
 
-function Logo({ src }: { src: string }) {
-  return <img src={src} alt="Savvy Cyber Kids" width={canvaTemplate.layout.logoWidth} height={canvaTemplate.layout.logoHeight} style={{ position: "absolute", top: canvaTemplate.layout.logoTop, right: canvaTemplate.layout.logoRight, width: canvaTemplate.layout.logoWidth, height: canvaTemplate.layout.logoHeight, objectFit: "contain" }} />;
+function Logo({ src, adjustment }: { src: string; adjustment?: GraphicAdjustments["badge"] }) {
+  if (adjustment === null) return null;
+  const badge = adjustment ?? { x: ((canvaTemplate.width - canvaTemplate.layout.logoRight - canvaTemplate.layout.logoWidth) / canvaTemplate.width) * 100, y: (canvaTemplate.layout.logoTop / canvasHeight) * 100, width: (canvaTemplate.layout.logoWidth / canvaTemplate.width) * 100, height: (canvaTemplate.layout.logoHeight / canvasHeight) * 100 };
+  return <img src={src} alt="Savvy Cyber Kids" width={canvaTemplate.layout.logoWidth} height={canvaTemplate.layout.logoHeight} style={{ position: "absolute", left: `${badge.x}%`, top: `${badge.y}%`, width: `${badge.width}%`, height: `${badge.height}%`, objectFit: "contain" }} />;
 }
 
 export async function renderTemplateGraphic(input: GraphicInput) {
@@ -177,7 +179,7 @@ export async function renderTemplateGraphic(input: GraphicInput) {
             }}
           />
         ))}
-        <Logo src={logoData} />
+        <Logo src={logoData} adjustment={input.adjustments?.badge} />
         <div
           style={{
             position: "absolute",

@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { canvaTemplate } from "@/config/template";
 import { GraphicAdjustments, OverlayRegion, defaultAdjustments } from "@/src/design/graphic-adjustments";
 import { canvasHeight, canvasWidth, composition, focusSensitivity, headingBlockHeight, textBottomInset } from "@/src/design/graphic-layout";
 import { LivePreview } from "./LivePreview";
 
-export type Selection = "image" | "heading" | "headline" | { region: number } | null;
+export type Selection = "image" | "badge" | "heading" | "headline" | { region: number } | null;
 
 type DragKind = "move" | "scale";
 
@@ -108,6 +109,14 @@ export function GraphicCanvas({
       next = drag.kind === "scale"
         ? { ...next, zoom: clamp(from.zoom + dy / 600, 0, 1) }
         : nudgeImage(drag.from, dx, dy);
+    } else if (drag.target === "badge") {
+      const source = drag.from.badge;
+      if (!source) return;
+      const px = (dx / canvasWidth) * 100;
+      const py = (dy / canvasHeight) * 100;
+      next.badge = drag.kind === "scale"
+        ? { ...source, width: clamp(source.width + px, 4, 60), height: clamp(source.height + py, 4, 60) }
+        : { ...source, x: clamp(source.x + px, 0, 100 - source.width), y: clamp(source.y + py, 0, 100 - source.height) };
     } else if (drag.target === "heading" || drag.target === "headline") {
       if (drag.kind === "scale") {
         if (drag.target === "heading") next.headingScale = clamp(from.headingScale + dy / 400, 0.6, 1.4);
@@ -155,7 +164,7 @@ export function GraphicCanvas({
       if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
       if (event.key === "Escape") { onSelect(null); return; }
       if (event.key === "Delete" || event.key === "Backspace") {
-        if (typeof selection === "object" && selection) { event.preventDefault(); onDeleteSelected(); }
+      if (selection === "badge" || (typeof selection === "object" && selection)) { event.preventDefault(); onDeleteSelected(); }
         return;
       }
       const step = event.shiftKey ? 20 : 4;
@@ -167,6 +176,7 @@ export function GraphicCanvas({
       const base = { ...defaultAdjustments, ...current };
 
       if (selection === "image") onChange(nudgeImage(current, dx, dy));
+      else if (selection === "badge" && current.badge) onChange({ ...current, badge: { ...current.badge, x: clamp(current.badge.x + (dx / canvasWidth) * 100, 0, 100 - current.badge.width), y: clamp(current.badge.y + (dy / canvasHeight) * 100, 0, 100 - current.badge.height) } });
       else if (selection === "heading" || selection === "headline") onChange({ ...current, textTop: clamp(base.textTop + dy, 600, 1100) });
       else if (typeof selection === "object" && selection) {
         const list = current.regions ?? [];
@@ -223,6 +233,7 @@ export function GraphicCanvas({
           <Box target="image" label="Photo" style={{ left: 0, top: 0, width: canvasWidth, height: layout.textTop }} hint="Drag to move the photo" />
           <Box target="heading" label="Heading" style={{ left: 0, top: layout.textTop, width: canvasWidth, height: headingBlockHeight }} hint="Drag to move, corner to resize" />
           <Box target="headline" label="Headline" style={{ left: 0, top: layout.textTop + headingBlockHeight, width: canvasWidth, height: Math.max(40, textHeight - headingBlockHeight) }} hint="Drag to move, corner to resize" />
+          {values.badge !== null ? <Box target="badge" label="Badge" style={{ left: `${values.badge?.x ?? ((canvasWidth - canvaTemplate.layout.logoRight - canvaTemplate.layout.logoWidth) / canvasWidth) * 100}%`, top: `${values.badge?.y ?? (canvaTemplate.layout.logoTop / canvasHeight) * 100}%`, width: `${values.badge?.width ?? (canvaTemplate.layout.logoWidth / canvasWidth) * 100}%`, height: `${values.badge?.height ?? (canvaTemplate.layout.logoHeight / canvasHeight) * 100}%` }} hint="Drag to move, corner to resize. Delete removes it." /> : null}
           {regions.map((region, index) => (
             <Box
               key={`region-${index}`}

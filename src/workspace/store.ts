@@ -4,10 +4,12 @@ import { PostStatus } from "@/src/workflow/state";
 import { WorkspaceFeedback, WorkspacePost, WorkspaceState } from "./types";
 import { GraphicAdjustments } from "@/src/design/graphic-adjustments";
 import { LayoutMemoryEntry, recallLayout, rememberLayout } from "@/src/design/layout-memory";
+import { documents } from "@/src/storage";
 
 const filePath = path.join(process.cwd(), "storage/workspace.json");
 
 async function readState(): Promise<WorkspaceState> {
+  if (process.env.NODE_ENV === "production" && (process.env.BLOB_STORE_ID || process.env.BLOB_READ_WRITE_TOKEN)) return (await documents.read<WorkspaceState>("workspace")) ?? { posts: [] };
   try {
     return JSON.parse(await readFile(filePath, "utf8")) as WorkspaceState;
   } catch {
@@ -40,6 +42,10 @@ export function dedupePosts(posts: WorkspacePost[]): WorkspacePost[] {
 }
 
 async function writeState(state: WorkspaceState): Promise<void> {
+  if (process.env.NODE_ENV === "production" && (process.env.BLOB_STORE_ID || process.env.BLOB_READ_WRITE_TOKEN)) {
+    await documents.write("workspace", state);
+    return;
+  }
   await mkdir(path.dirname(filePath), { recursive: true });
   await writeFile(filePath, JSON.stringify(state, null, 2));
 }
