@@ -72,10 +72,11 @@ async function generateWithProvider(article: SourceArticle, reviewerGuidance?: s
   return validateGeneratedPost({ ...generatedSocialPostSchema.parse(parsed), article_title: article.title }, article.title);
 }
 
-export async function generateSocialPost(article: SourceArticle, reviewerGuidance?: string): Promise<GeneratedSocialPost> {
+export async function generateSocialPost(article: SourceArticle, reviewerGuidance?: string, options: { fallback?: boolean } = {}): Promise<GeneratedSocialPost> {
   try {
     return await generateWithProvider(article, reviewerGuidance);
   } catch (error) {
+    if (options.fallback === false) throw error;
     console.warn("AI content/vision request failed; using local fallback:", error instanceof Error ? error.message : "unknown error");
     return createLocalPost(article);
   }

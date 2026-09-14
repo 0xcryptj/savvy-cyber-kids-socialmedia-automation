@@ -118,6 +118,7 @@ export default function ReviewPage() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Caption regeneration failed");
       setPost(payload); setCopy(`${payload.caption}\n\n${payload.hashtags.join(" ")}`);
+      setFeedbackNote("");
       setReviewQueue(current => current.map(item => item.id === payload.id ? payload : item));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Caption regeneration failed");

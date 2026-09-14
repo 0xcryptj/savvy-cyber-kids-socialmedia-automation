@@ -7,6 +7,7 @@ import { findPostByCanonicalUrl, savePost, recallApprovedLayout } from "@/src/wo
 import { WorkspacePost } from "@/src/workspace/types";
 import { inspectArticleImage, generateOpenAIBackground } from "@/src/design/openai-image";
 import { layoutKey } from "@/src/design/layout-memory";
+import { aiProviderConfigured } from "@/src/config/ai-settings";
 
 export async function processArticle(input: { canonicalUrl: string; category: ContentCategory; sourceArticle?: SourceArticle }): Promise<WorkspacePost> {
   const existing = await findPostByCanonicalUrl(input.canonicalUrl);
@@ -24,7 +25,7 @@ export async function processArticle(input: { canonicalUrl: string; category: Co
   }
 
   const article = await hydrateArticle(found ?? selected!);
-  const generatedRaw = await generateSocialPost(article);
+  const generatedRaw = await generateSocialPost(article, undefined, { fallback: !(await aiProviderConfigured()) });
   const generated = finalizeGeneratedPost(generatedRaw);
   let generatedImageUrl: string | undefined;
   const sourceImage = await inspectArticleImage(article.featuredImageUrl);

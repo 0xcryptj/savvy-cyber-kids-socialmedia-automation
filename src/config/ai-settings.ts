@@ -6,7 +6,7 @@ export type AISettings = { provider: AIProvider; model: string; baseUrl?: string
 
 export const providerModels: Record<AIProvider, string[]> = {
   openai: ["gpt-4o-mini", "gpt-4o"],
-  anthropic: ["claude-sonnet-5", "claude-haiku-4-5", "claude-sonnet-4-6"],
+  anthropic: ["claude-sonnet-5", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
   "openai-compatible": []
 };
 
@@ -53,6 +53,11 @@ export async function saveAISettings(input: Partial<AISettings>): Promise<AISett
   };
   await documents.write("settings", next);
   return next;
+}
+
+export async function aiProviderConfigured(): Promise<boolean> {
+  const settings = await getAISettings();
+  return providerHasCredential(settings.provider);
 }
 
 export function providerIsConfigured(provider: AIProvider): boolean {

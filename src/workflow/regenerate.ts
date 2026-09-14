@@ -42,7 +42,7 @@ export async function regeneratePost(id: string, reviewerGuidance?: string): Pro
 
   const { article, usedFallbackSource } = await resolveArticle(previous);
   const guidance = boundedText(reviewerGuidance, 1000);
-  const generatedRaw = await generateSocialPost(article, guidance);
+  const generatedRaw = await generateSocialPost(article, guidance, { fallback: false });
   const generated = finalizeGeneratedPost(generatedRaw);
   let generatedImageUrl: string | undefined;
   const sourceImage = await inspectArticleImage(article.featuredImageUrl);

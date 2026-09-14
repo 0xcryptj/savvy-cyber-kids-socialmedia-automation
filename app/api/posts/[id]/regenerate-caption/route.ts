@@ -10,6 +10,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const body = await request.json().catch(() => ({})) as { reviewerGuidance?: unknown };
     return NextResponse.json(await regenerateCaption(id, boundedText(body.reviewerGuidance, 1000)));
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Caption regeneration failed" }, { status: 422 });
+    const detail = error instanceof Error ? error.message : "Caption regeneration failed";
+    console.error("Caption regeneration failed", detail);
+    return NextResponse.json({ error: `Caption regeneration failed: ${detail}` }, { status: 422 });
   }
 }
