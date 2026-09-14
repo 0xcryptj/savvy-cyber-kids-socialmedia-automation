@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAISettings, providerHasCredential, saveAISettings, AIProvider } from "@/src/config/ai-settings";
+import { getAISettings, providerCredentialStatus, providerHasCredential, providerModels, saveAISettings, AIProvider } from "@/src/config/ai-settings";
 import { saveStoredCredential } from "@/src/config/credentials";
 import { sameOrigin } from "@/src/lib/request-security";
 import { getPostizSettings, safePostizSettings, savePostizSettings, PostizTest } from "@/src/config/postiz-settings";
@@ -9,10 +9,10 @@ import { testPostizConnection } from "@/src/integrations/postiz";
 export async function GET() {
   const settings = await getAISettings();
   const postiz = await getPostizSettings();
-  return NextResponse.json({ ...settings, configured: await providerHasCredential(settings.provider), postiz: safePostizSettings(postiz), providers: [
-    { id: "openai", label: "OpenAI", hint: "Hosted OpenAI models", models: ["gpt-4o-mini", "gpt-4o"] },
-    { id: "anthropic", label: "Anthropic", hint: "Hosted Claude models", models: ["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"] },
-    { id: "openai-compatible", label: "OpenAI-compatible", hint: "OpenRouter, Groq, Together, Ollama, or your own endpoint", models: [] }
+  return NextResponse.json({ ...settings, configured: await providerHasCredential(settings.provider), providerCredentials: await providerCredentialStatus(), postiz: safePostizSettings(postiz), providers: [
+    { id: "openai", label: "OpenAI", hint: "Hosted OpenAI models for captions and hashtags", models: providerModels.openai },
+    { id: "anthropic", label: "Anthropic", hint: "Hosted Claude models for captions and hashtags", models: providerModels.anthropic },
+    { id: "openai-compatible", label: "OpenAI-compatible", hint: "OpenRouter, Groq, Together, Ollama, or your own endpoint", models: providerModels["openai-compatible"] }
   ] });
 }
 
@@ -25,7 +25,7 @@ export async function PATCH(request: NextRequest) {
   if (typeof body.apiKey === "string" && body.provider) await saveStoredCredential(body.provider, body.apiKey);
   if (typeof body.postizApiKey === "string") await saveStoredPostizCredential(body.postizApiKey);
   const postiz = await savePostizSettings({ apiUrl: body.postizApiUrl });
-  return NextResponse.json({ ...settings, configured: await providerHasCredential(settings.provider), postiz: safePostizSettings(postiz) });
+  return NextResponse.json({ ...settings, configured: await providerHasCredential(settings.provider), providerCredentials: await providerCredentialStatus(), postiz: safePostizSettings(postiz) });
 }
 
 export async function POST(request: NextRequest) {

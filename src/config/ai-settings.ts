@@ -4,14 +4,33 @@ import { getStoredCredential } from "./credentials";
 export type AIProvider = "openai" | "anthropic" | "openai-compatible";
 export type AISettings = { provider: AIProvider; model: string; baseUrl?: string };
 
-const defaults: AISettings = {
-  provider: (process.env.AI_PROVIDER as AIProvider) || (process.env.ANTHROPIC_API_KEY ? "anthropic" : "openai"),
-  model: process.env.AI_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini",
-  baseUrl: process.env.AI_BASE_URL || ""
+export const providerModels: Record<AIProvider, string[]> = {
+  openai: ["gpt-4o-mini", "gpt-4o"],
+  anthropic: ["claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
+  "openai-compatible": []
 };
 
+function defaultProvider(): AIProvider {
+  return (process.env.AI_PROVIDER as AIProvider) || (process.env.ANTHROPIC_API_KEY ? "anthropic" : "openai");
+}
+
+function defaultModel(provider: AIProvider): string {
+  if (process.env.AI_MODEL) return process.env.AI_MODEL;
+  if (provider === "anthropic") return "claude-sonnet-4-6";
+  return process.env.OPENAI_MODEL || "gpt-4o-mini";
+}
+
+function defaultSettings(): AISettings {
+  const provider = defaultProvider();
+  return {
+    provider,
+    model: defaultModel(provider),
+    baseUrl: process.env.AI_BASE_URL || ""
+  };
+}
+
 export async function getAISettings(): Promise<AISettings> {
-  return { ...defaults, ...(await documents.read<Partial<AISettings>>("settings")) };
+  return { ...defaultSettings(), ...(await documents.read<Partial<AISettings>>("settings")) };
 }
 
 export async function saveAISettings(input: Partial<AISettings>): Promise<AISettings> {
@@ -32,6 +51,14 @@ export function providerIsConfigured(provider: AIProvider): boolean {
 
 export async function providerHasCredential(provider: AIProvider): Promise<boolean> {
   return Boolean((await getStoredCredential(provider)) || providerIsConfigured(provider));
+}
+
+export async function providerCredentialStatus(): Promise<Record<AIProvider, boolean>> {
+  return {
+    openai: await providerHasCredential("openai"),
+    anthropic: await providerHasCredential("anthropic"),
+    "openai-compatible": await providerHasCredential("openai-compatible")
+  };
 }
 
 export function normalizeBaseUrl(value: string | undefined, fallback = ""): string {
