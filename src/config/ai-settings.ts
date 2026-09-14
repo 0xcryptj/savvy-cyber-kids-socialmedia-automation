@@ -2,7 +2,7 @@ import { documents } from "@/src/storage";
 import { getStoredCredential } from "./credentials";
 
 export type AIProvider = "openai" | "anthropic" | "openai-compatible";
-export type AISettings = { provider: AIProvider; model: string; baseUrl?: string };
+export type AISettings = { provider: AIProvider; model: string; baseUrl?: string; anthropicWorkspaceId?: string };
 
 export const providerModels: Record<AIProvider, string[]> = {
   openai: ["gpt-4o-mini", "gpt-4o"],
@@ -25,7 +25,8 @@ function defaultSettings(): AISettings {
   return {
     provider,
     model: defaultModel(provider),
-    baseUrl: process.env.AI_BASE_URL || ""
+    baseUrl: process.env.AI_BASE_URL || "",
+    anthropicWorkspaceId: process.env.ANTHROPIC_WORKSPACE_ID || ""
   };
 }
 
@@ -40,7 +41,7 @@ export async function getAISettings(): Promise<AISettings> {
   const defaults = defaultSettings();
   const stored = await documents.read<Partial<AISettings>>("settings");
   const provider = stored?.provider === "openai" || stored?.provider === "anthropic" || stored?.provider === "openai-compatible" ? stored.provider : defaults.provider;
-  return { provider, model: normalizeModel(provider, stored?.model, defaults.model), baseUrl: stored?.baseUrl ?? defaults.baseUrl };
+  return { provider, model: normalizeModel(provider, stored?.model, defaults.model), baseUrl: stored?.baseUrl ?? defaults.baseUrl, anthropicWorkspaceId: normalizeWorkspaceId(stored?.anthropicWorkspaceId ?? defaults.anthropicWorkspaceId) };
 }
 
 export async function saveAISettings(input: Partial<AISettings>): Promise<AISettings> {
@@ -49,7 +50,8 @@ export async function saveAISettings(input: Partial<AISettings>): Promise<AISett
   const next: AISettings = {
     provider,
     model: normalizeModel(provider, input.model, provider === current.provider ? current.model : defaultModel(provider)),
-    baseUrl: normalizeBaseUrl(input.baseUrl, current.baseUrl)
+    baseUrl: normalizeBaseUrl(input.baseUrl, current.baseUrl),
+    anthropicWorkspaceId: normalizeWorkspaceId(input.anthropicWorkspaceId ?? current.anthropicWorkspaceId)
   };
   await documents.write("settings", next);
   return next;
@@ -74,6 +76,11 @@ export async function providerCredentialStatus(): Promise<Record<AIProvider, boo
     anthropic: await providerHasCredential("anthropic"),
     "openai-compatible": await providerHasCredential("openai-compatible")
   };
+}
+
+function normalizeWorkspaceId(value: string | undefined): string {
+  if (typeof value !== "string") return "";
+  return /^[A-Za-z0-9_-]{8,200}$/.test(value.trim()) ? value.trim() : "";
 }
 
 export function normalizeBaseUrl(value: string | undefined, fallback = ""): string {

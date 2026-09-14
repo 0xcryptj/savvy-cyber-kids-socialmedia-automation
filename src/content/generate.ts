@@ -54,7 +54,7 @@ async function generateWithProvider(article: SourceArticle, reviewerGuidance?: s
   const prompt = `Article title (preserve exactly): ${article.title}\nCategory: ${article.category}\n\nBody:\n${(article.body || article.excerpt).slice(0, 4000)}${feedbackContext}${guidanceContext}`;
   let response: Response;
   if (settings.provider === "anthropic") {
-    response = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" }, body: JSON.stringify({ model: settings.model, max_tokens: 900, system: systemPrompt, messages: [{ role: "user", content: prompt }] }) });
+    response = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", ...(settings.anthropicWorkspaceId ? { "anthropic-workspace-id": settings.anthropicWorkspaceId } : {}) }, body: JSON.stringify({ model: settings.model, max_tokens: 900, system: systemPrompt, messages: [{ role: "user", content: prompt }] }) });
   } else {
     const base = (settings.baseUrl || (settings.provider === "openai" ? "https://api.openai.com/v1" : "https://openrouter.ai/api/v1")).replace(/\/$/, "");
     const userContent = settings.provider === "openai" && article.featuredImageUrl

@@ -28,10 +28,10 @@ afterEach(async () => {
 
 describe("AI settings", () => {
   it("saves the selected provider and encrypted key globally", async () => {
-    await saveAISettings({ provider: "anthropic", model: "claude-sonnet-5" });
+    await saveAISettings({ provider: "anthropic", model: "claude-sonnet-5", anthropicWorkspaceId: "wrkspc_test123" });
     await saveStoredCredential("anthropic", "sk-ant-test");
 
-    expect(await getAISettings()).toMatchObject({ provider: "anthropic", model: "claude-sonnet-5" });
+    expect(await getAISettings()).toMatchObject({ provider: "anthropic", model: "claude-sonnet-5", anthropicWorkspaceId: "wrkspc_test123" });
     expect(await getStoredCredential("anthropic")).toBe("sk-ant-test");
     expect(await providerHasCredential("anthropic")).toBe(true);
     expect(await providerCredentialStatus()).toMatchObject({ anthropic: true, openai: false });
@@ -55,5 +55,13 @@ describe("AI settings", () => {
 
     await saveAISettings({ provider: "anthropic", model: "__custom" });
     expect((await getAISettings()).model).toBe("claude-sonnet-5");
+  });
+
+  it("sanitizes the optional Anthropic workspace id", async () => {
+    await saveAISettings({ provider: "anthropic", anthropicWorkspaceId: "bad value!" });
+    expect((await getAISettings()).anthropicWorkspaceId).toBe("");
+
+    await saveAISettings({ provider: "anthropic", anthropicWorkspaceId: "workspace_abc-123" });
+    expect((await getAISettings()).anthropicWorkspaceId).toBe("workspace_abc-123");
   });
 });

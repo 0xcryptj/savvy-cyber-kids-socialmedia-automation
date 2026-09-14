@@ -101,7 +101,7 @@ export async function regenerateCaption(id: string, reviewerGuidance?: string): 
 
   const { article } = await resolveArticle(previous);
   const guidance = boundedText(reviewerGuidance, 1000);
-  const generatedRaw = await generateSocialPost(article, guidance);
+  const generatedRaw = await generateSocialPost(article, guidance, { fallback: false });
   const { caption, hashtags } = finalizeGeneratedPost(generatedRaw);
   return savePost({ ...previous, caption, hashtags });
 }

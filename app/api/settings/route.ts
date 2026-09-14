@@ -19,7 +19,7 @@ export async function GET() {
 export async function PATCH(request: NextRequest) {
   const originError = sameOrigin(request);
   if (originError) return originError;
-  const body = await request.json() as { provider?: AIProvider; model?: string; baseUrl?: string; apiKey?: string; postizApiKey?: string; postizApiUrl?: string };
+  const body = await request.json() as { provider?: AIProvider; model?: string; baseUrl?: string; anthropicWorkspaceId?: string; apiKey?: string; postizApiKey?: string; postizApiUrl?: string };
   if (body.provider && !["openai", "anthropic", "openai-compatible"].includes(body.provider)) return NextResponse.json({ error: "Unsupported AI provider" }, { status: 400 });
   const settings = await saveAISettings(body);
   if (typeof body.apiKey === "string" && body.provider) await saveStoredCredential(body.provider, body.apiKey);
