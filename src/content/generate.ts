@@ -31,6 +31,15 @@ async function apiKey(provider: "openai" | "anthropic" | "openai-compatible") {
   return stored || (provider === "anthropic" ? process.env.ANTHROPIC_API_KEY || process.env.AI_API_KEY : process.env.OPENAI_API_KEY || process.env.AI_API_KEY);
 }
 
+export function parseGeneratedPostJson(raw: string): unknown {
+  const trimmed = raw.trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
+  try { return JSON.parse(trimmed); } catch {}
+  const start = trimmed.indexOf("{");
+  const end = trimmed.lastIndexOf("}");
+  if (start >= 0 && end > start) return JSON.parse(trimmed.slice(start, end + 1));
+  return JSON.parse(trimmed);
+}
+
 async function generateWithProvider(article: SourceArticle, reviewerGuidance?: string): Promise<GeneratedSocialPost> {
   const settings = await getAISettings();
   const key = await apiKey(settings.provider);
@@ -53,10 +62,13 @@ async function generateWithProvider(article: SourceArticle, reviewerGuidance?: s
       : prompt;
     response = await fetch(`${base}/chat/completions`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${key}` }, body: JSON.stringify({ model: settings.model, temperature: 0.7, response_format: { type: "json_object" }, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userContent }] }) });
   }
-  if (!response.ok) throw new Error(`AI provider request failed (${response.status})`);
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(`AI provider request failed (${response.status})${body ? `: ${body.slice(0, 500)}` : ""}`);
+  }
   const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }>; content?: Array<{ text?: string }> };
   const raw = payload.choices?.[0]?.message?.content || payload.content?.[0]?.text || "";
-  const parsed = JSON.parse(raw.replace(/^```json\s*|\s*```$/g, ""));
+  const parsed = parseGeneratedPostJson(raw);
   return validateGeneratedPost({ ...generatedSocialPostSchema.parse(parsed), article_title: article.title }, article.title);
 }
 

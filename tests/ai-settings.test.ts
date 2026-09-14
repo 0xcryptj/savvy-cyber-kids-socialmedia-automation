@@ -28,10 +28,10 @@ afterEach(async () => {
 
 describe("AI settings", () => {
   it("saves the selected provider and encrypted key globally", async () => {
-    await saveAISettings({ provider: "anthropic", model: "claude-sonnet-4-6" });
+    await saveAISettings({ provider: "anthropic", model: "claude-sonnet-5" });
     await saveStoredCredential("anthropic", "sk-ant-test");
 
-    expect(await getAISettings()).toMatchObject({ provider: "anthropic", model: "claude-sonnet-4-6" });
+    expect(await getAISettings()).toMatchObject({ provider: "anthropic", model: "claude-sonnet-5" });
     expect(await getStoredCredential("anthropic")).toBe("sk-ant-test");
     expect(await providerHasCredential("anthropic")).toBe(true);
     expect(await providerCredentialStatus()).toMatchObject({ anthropic: true, openai: false });
@@ -45,7 +45,15 @@ describe("AI settings", () => {
     process.env.AI_PROVIDER = "anthropic";
     await saveAISettings({ provider: "anthropic" });
 
-    expect((await getAISettings()).model).toBe("claude-sonnet-4-6");
+    expect((await getAISettings()).model).toBe("claude-sonnet-5");
     expect(await providerHasCredential("anthropic")).toBe(true);
+  });
+
+  it("replaces stale preset-provider models instead of saving a placeholder", async () => {
+    await saveAISettings({ provider: "anthropic", model: "claude-3-5-sonnet-latest" });
+    expect((await getAISettings()).model).toBe("claude-sonnet-5");
+
+    await saveAISettings({ provider: "anthropic", model: "__custom" });
+    expect((await getAISettings()).model).toBe("claude-sonnet-5");
   });
 });

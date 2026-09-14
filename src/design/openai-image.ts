@@ -1,5 +1,4 @@
 import { safeFetch } from "@/src/lib/safe-fetch";
-import { getAISettings } from "@/src/config/ai-settings";
 import { getStoredCredential } from "@/src/config/credentials";
 import { DesignRenderer, RenderRequest, RenderedGraphic } from "./renderer";
 
@@ -47,15 +46,13 @@ export async function articleImageAvailable(imageUrl?: string): Promise<boolean>
 }
 
 async function imageApiKey() {
-  const settings = await getAISettings();
-  if (settings.provider !== "openai") throw new Error("OpenAI image generation requires the OpenAI provider");
-  return { settings, key: (await getStoredCredential("openai")) || process.env.OPENAI_API_KEY || process.env.AI_API_KEY };
+  return { key: (await getStoredCredential("openai")) || process.env.OPENAI_API_KEY || process.env.AI_API_KEY };
 }
 
 export async function generateOpenAIBackground(input: RenderRequest & { guidance?: string }): Promise<string> {
-  const { settings, key } = await imageApiKey();
+  const { key } = await imageApiKey();
   if (!key) throw new Error("OPENAI_API_KEY is not configured");
-  const base = (settings.baseUrl || "https://api.openai.com/v1").replace(/\/$/, "");
+  const base = "https://api.openai.com/v1";
   const prompt = `A photorealistic editorial photograph for a family cybersecurity article. Topic: ${input.topicHeading}. Article: ${input.articleTitle}. ${input.guidance || ""}
 
 Shoot it like a real photograph taken on a full-frame camera with a fast prime lens: natural available light, true-to-life skin tones and materials, believable depth of field, subtle imperfection, the look of documentary lifestyle photography rather than stock. Real people and real rooms, warm and unposed, safe and age-appropriate.

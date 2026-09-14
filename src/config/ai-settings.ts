@@ -6,7 +6,7 @@ export type AISettings = { provider: AIProvider; model: string; baseUrl?: string
 
 export const providerModels: Record<AIProvider, string[]> = {
   openai: ["gpt-4o-mini", "gpt-4o"],
-  anthropic: ["claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
+  anthropic: ["claude-sonnet-5", "claude-haiku-4-5", "claude-sonnet-4-6"],
   "openai-compatible": []
 };
 
@@ -16,7 +16,7 @@ function defaultProvider(): AIProvider {
 
 function defaultModel(provider: AIProvider): string {
   if (process.env.AI_MODEL) return process.env.AI_MODEL;
-  if (provider === "anthropic") return "claude-sonnet-4-6";
+  if (provider === "anthropic") return "claude-sonnet-5";
   return process.env.OPENAI_MODEL || "gpt-4o-mini";
 }
 
@@ -29,16 +29,26 @@ function defaultSettings(): AISettings {
   };
 }
 
+function normalizeModel(provider: AIProvider, value: string | undefined, fallback: string): string {
+  const candidate = typeof value === "string" ? value.trim().slice(0, 120) : "";
+  const presets = providerModels[provider];
+  if (presets.length) return candidate && presets.includes(candidate) ? candidate : defaultModel(provider);
+  return candidate && /^[A-Za-z0-9._:/-]+$/.test(candidate) ? candidate : fallback;
+}
+
 export async function getAISettings(): Promise<AISettings> {
-  return { ...defaultSettings(), ...(await documents.read<Partial<AISettings>>("settings")) };
+  const defaults = defaultSettings();
+  const stored = await documents.read<Partial<AISettings>>("settings");
+  const provider = stored?.provider === "openai" || stored?.provider === "anthropic" || stored?.provider === "openai-compatible" ? stored.provider : defaults.provider;
+  return { provider, model: normalizeModel(provider, stored?.model, defaults.model), baseUrl: stored?.baseUrl ?? defaults.baseUrl };
 }
 
 export async function saveAISettings(input: Partial<AISettings>): Promise<AISettings> {
   const current = await getAISettings();
-  const candidateModel = typeof input.model === "string" ? input.model.trim().slice(0, 120) : "";
+  const provider = input.provider === "openai" || input.provider === "anthropic" || input.provider === "openai-compatible" ? input.provider : current.provider;
   const next: AISettings = {
-    provider: input.provider === "openai" || input.provider === "anthropic" || input.provider === "openai-compatible" ? input.provider : current.provider,
-    model: candidateModel && /^[A-Za-z0-9._:/-]+$/.test(candidateModel) ? candidateModel : current.model,
+    provider,
+    model: normalizeModel(provider, input.model, provider === current.provider ? current.model : defaultModel(provider)),
     baseUrl: normalizeBaseUrl(input.baseUrl, current.baseUrl)
   };
   await documents.write("settings", next);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { contentRules } from "@/config/content-rules";
-import { finalizeGeneratedPost } from "@/src/content/generate";
+import { finalizeGeneratedPost, parseGeneratedPostJson } from "@/src/content/generate";
 import { createLocalPost } from "@/src/content/local-copy";
 import { validateEditableHashtags, validateGeneratedPost } from "@/src/content/validate";
 
@@ -11,5 +11,8 @@ describe("social content rules", () => {
   it("allows editable hashtags while retaining the required tags", () => {
     expect(validateEditableHashtags(["#privacy", "#familytech", "#savvycyberkids", "#cyberhero"])).toEqual(["#privacy", "#familytech", "#savvycyberkids", "#cyberhero"]);
     expect(() => validateEditableHashtags(["#privacy", "#familytech", "#one", "#two"])).toThrow();
+  });
+  it("extracts JSON when a provider wraps it in extra text", () => {
+    expect(parseGeneratedPostJson('Here is the JSON:\n{"topic_heading":"TOPIC","article_title":"Title","caption":"Caption","hashtags":["#one","#two"],"source_image_has_text":false}')).toMatchObject({ caption: "Caption" });
   });
 });
