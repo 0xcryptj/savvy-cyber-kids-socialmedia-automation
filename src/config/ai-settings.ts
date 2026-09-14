@@ -57,6 +57,10 @@ export async function saveAISettings(input: Partial<AISettings>): Promise<AISett
   return next;
 }
 
+export async function saveAnthropicWorkspaceId(workspaceId: string): Promise<AISettings> {
+  return saveAISettings({ anthropicWorkspaceId: workspaceId });
+}
+
 export async function aiProviderConfigured(): Promise<boolean> {
   const settings = await getAISettings();
   return providerHasCredential(settings.provider);

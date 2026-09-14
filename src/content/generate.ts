@@ -5,6 +5,7 @@ import { buildFinalPost, validateGeneratedPost } from "./validate";
 import { plannedCaptionBudget, strictestPlatformLimit } from "./caption-limits";
 import { contentRules } from "@/config/content-rules";
 import { getAISettings } from "@/src/config/ai-settings";
+import { saveAnthropicWorkspaceId } from "@/src/config/ai-settings";
 import { getStoredCredential } from "@/src/config/credentials";
 import { recentFeedback } from "@/src/workspace/store";
 
@@ -31,6 +32,19 @@ async function apiKey(provider: "openai" | "anthropic" | "openai-compatible") {
   return stored || (provider === "anthropic" ? process.env.ANTHROPIC_API_KEY || process.env.AI_API_KEY : process.env.OPENAI_API_KEY || process.env.AI_API_KEY);
 }
 
+function needsAnthropicWorkspace(errorBody: string): boolean {
+  return errorBody.includes("anthropic-workspace-id") || errorBody.includes("not scoped to a workspace");
+}
+
+async function discoverAnthropicWorkspaceId(key: string): Promise<string | undefined> {
+  const response = await fetch("https://api.anthropic.com/v1/organizations/workspaces?beta=true", {
+    headers: { "x-api-key": key, "anthropic-version": "2023-06-01" }
+  });
+  if (!response.ok) return undefined;
+  const payload = await response.json().catch(() => null) as { data?: Array<{ id?: string }> } | null;
+  return payload?.data?.find((workspace) => workspace.id?.startsWith("wrkspc_"))?.id;
+}
+
 export function parseGeneratedPostJson(raw: string): unknown {
   const trimmed = raw.trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
   try { return JSON.parse(trimmed); } catch {}
@@ -53,8 +67,26 @@ async function generateWithProvider(article: SourceArticle, reviewerGuidance?: s
     : "";
   const prompt = `Article title (preserve exactly): ${article.title}\nCategory: ${article.category}\n\nBody:\n${(article.body || article.excerpt).slice(0, 4000)}${feedbackContext}${guidanceContext}`;
   let response: Response;
+  let retriedWithWorkspace = false;
   if (settings.provider === "anthropic") {
-    response = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", ...(settings.anthropicWorkspaceId ? { "anthropic-workspace-id": settings.anthropicWorkspaceId } : {}) }, body: JSON.stringify({ model: settings.model, max_tokens: 900, system: systemPrompt, messages: [{ role: "user", content: prompt }] }) });
+    const body = JSON.stringify({ model: settings.model, max_tokens: 900, system: systemPrompt, messages: [{ role: "user", content: prompt }] });
+    const request = (workspaceId?: string) => fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", ...(workspaceId ? { "anthropic-workspace-id": workspaceId } : {}) }, body });
+    response = await request(settings.anthropicWorkspaceId);
+    if (!response.ok) {
+      const errorBody = await response.text().catch(() => "");
+      if (!settings.anthropicWorkspaceId && needsAnthropicWorkspace(errorBody)) {
+        const workspaceId = await discoverAnthropicWorkspaceId(key);
+        if (workspaceId) {
+          await saveAnthropicWorkspaceId(workspaceId);
+          response = await request(workspaceId);
+          retriedWithWorkspace = true;
+        } else {
+          throw new Error(`AI provider request failed (${response.status}): ${errorBody.slice(0, 500)} Could not discover an Anthropic workspace ID automatically.`);
+        }
+      } else {
+        throw new Error(`AI provider request failed (${response.status})${errorBody ? `: ${errorBody.slice(0, 500)}` : ""}`);
+      }
+    }
   } else {
     const base = (settings.baseUrl || (settings.provider === "openai" ? "https://api.openai.com/v1" : "https://openrouter.ai/api/v1")).replace(/\/$/, "");
     const userContent = settings.provider === "openai" && article.featuredImageUrl
@@ -64,7 +96,7 @@ async function generateWithProvider(article: SourceArticle, reviewerGuidance?: s
   }
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    throw new Error(`AI provider request failed (${response.status})${body ? `: ${body.slice(0, 500)}` : ""}`);
+    throw new Error(`AI provider request failed (${response.status})${body ? `: ${body.slice(0, 500)}` : ""}${retriedWithWorkspace ? " The Anthropic workspace ID was discovered and saved, but the retry still failed." : ""}`);
   }
   const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }>; content?: Array<{ text?: string }> };
   const raw = payload.choices?.[0]?.message?.content || payload.content?.[0]?.text || "";
