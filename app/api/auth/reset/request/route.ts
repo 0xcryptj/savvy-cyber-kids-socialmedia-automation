@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createTemporaryPassword, setPassword } from "@/src/lib/auth";
 
+async function resendErrorMessage(response: Response): Promise<string> {
+  const fallback = "The email service could not accept the reset request. Check RESEND_API_KEY and RESEND_FROM_EMAIL.";
+  const body = await response.text().catch(() => "");
+  if (body) console.error("Password reset email was rejected by Resend", response.status, body);
+  else console.error("Password reset email was rejected by Resend", response.status);
+  if (response.status === 403) return "Resend rejected the sender or recipient. If RESEND_FROM_EMAIL uses onboarding@resend.dev, it can only send to the Resend account owner. Verify a domain in Resend and set RESEND_FROM_EMAIL to an address on that domain.";
+  return fallback;
+}
+
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null) as { email?: unknown } | null;
   const response = NextResponse.json({ ok: true });
   const authorizedResetEmails = ["info@savvycyberkids.org", "joarbiser@gmail.com"];
   const requestedEmail = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
-  if (!authorizedResetEmails.includes(requestedEmail) || !process.env.RESEND_API_KEY) return response;
+  if (!authorizedResetEmails.includes(requestedEmail)) return response;
+  if (!process.env.RESEND_API_KEY) return NextResponse.json({ error: "Password reset email is not configured. Set RESEND_API_KEY and RESEND_FROM_EMAIL." }, { status: 503 });
   const temporaryPassword = createTemporaryPassword();
   const origin = new URL(request.url).origin;
   const loginUrl = `${origin}/login`;
@@ -16,8 +26,7 @@ export async function POST(request: NextRequest) {
   // savvycyberkids.org is verified, both authorized recipients can be used.
   const emailResponse = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ from: process.env.RESEND_FROM_EMAIL ?? "Savvy Cyber Kids <onboarding@resend.dev>", to: [requestedEmail], subject: "Savvy Cyber Kids workspace password reset", text: `Your new workspace password is:\n\n${temporaryPassword}\n\nSign in here: ${loginUrl}\n\nKeep this password private.`, html }) });
   if (!emailResponse.ok) {
-    console.error("Password reset email was rejected by Resend", emailResponse.status);
-    return NextResponse.json({ error: "The email service could not accept the reset request. Please contact the workspace administrator." }, { status: 503 });
+    return NextResponse.json({ error: await resendErrorMessage(emailResponse) }, { status: 503 });
   }
   await setPassword(temporaryPassword);
   return response;
