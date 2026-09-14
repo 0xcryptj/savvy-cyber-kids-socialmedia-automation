@@ -22,5 +22,5 @@ export default function ForgotPasswordPage() {
     setBusy(false);
   }
 
-  return <main><section className="card settings-panel" style={{ maxWidth: 480, margin: "15vh auto" }}><p className="eyebrow">SAVVY CYBER KIDS</p><h2>Reset your password</h2>{sent ? <p>If the address is eligible, a reset email has been sent to it.</p> : <form onSubmit={submit} className="settings-grid"><label className="settings-wide">Account email<input type="email" value={email} onChange={e => setEmail(e.target.value)} required /></label><button disabled={busy}>{busy ? "Sending..." : "Send reset email"}</button>{error ? <p role="alert">{error}</p> : null}</form>}</section></main>;
+  return <main><section className="card settings-panel" style={{ maxWidth: 480, margin: "15vh auto" }}><p className="eyebrow">SAVVY CYBER KIDS</p><h2>Reset your password</h2>{sent ? <p>If the address is eligible, a reset email has been sent to the workspace recovery inbox.</p> : <form onSubmit={submit} className="settings-grid"><label className="settings-wide">Account email<input type="email" value={email} onChange={e => setEmail(e.target.value)} required /></label><button disabled={busy}>{busy ? "Sending..." : "Send reset email"}</button>{error ? <p role="alert">{error}</p> : null}</form>}</section></main>;
 }
