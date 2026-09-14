@@ -11,7 +11,7 @@ function resetRecipients(): string[] {
 }
 
 async function resendErrorMessage(response: Response): Promise<string> {
-  const fallback = "The email service could not accept the reset request. Check RESEND_API_KEY and RESEND_FROM_EMAIL.";
+  const fallback = "The email service could not accept the reset request. Check RESEND_API_KEY. RESEND_FROM_EMAIL is optional unless you have a verified Resend domain.";
   const body = await response.text().catch(() => "");
   if (body) console.error("Password reset email was rejected by Resend", response.status, body);
   else console.error("Password reset email was rejected by Resend", response.status);
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   const response = NextResponse.json({ ok: true });
   const requestedEmail = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
   if (!authorizedResetEmails.includes(requestedEmail)) return response;
-  if (!process.env.RESEND_API_KEY) return NextResponse.json({ error: "Password reset email is not configured. Set RESEND_API_KEY and RESEND_FROM_EMAIL." }, { status: 503 });
+  if (!process.env.RESEND_API_KEY) return NextResponse.json({ error: "Password reset email is not configured. Set RESEND_API_KEY in the running environment. RESEND_FROM_EMAIL is optional unless you have a verified Resend domain." }, { status: 503 });
   const temporaryPassword = createTemporaryPassword();
   const origin = new URL(request.url).origin;
   const loginUrl = `${origin}/login`;
