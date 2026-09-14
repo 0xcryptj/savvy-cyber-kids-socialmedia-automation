@@ -39,4 +39,4 @@ export interface BlobStore {
  * Documents holding credentials, written with restricted permissions by
  * backends that have a filesystem to restrict.
  */
-export const secretDocuments = new Set<DocumentKey>(["credentials", "postiz-settings"]);
+export const secretDocuments = new Set<DocumentKey>(["credentials", "postiz-settings", "auth"]);
